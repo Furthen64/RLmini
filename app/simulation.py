@@ -110,6 +110,7 @@ class Simulation:
             creature.recent_steps.clear()
             creature.active_memory_idx = None
             creature.active_step_idx = None
+            creature.last_replayed_memory_idx = None
             return
 
         # 2. Visible food pursuit (diagonal counts)
@@ -124,6 +125,7 @@ class Simulation:
                 creature.mode = CreatureMode.FOOD_DIRECT
                 creature.active_memory_idx = None
                 creature.active_step_idx = None
+                creature.last_replayed_memory_idx = None
                 self._execute_move(creature, action, sense, CreatureMode.FOOD_DIRECT)
                 return
 
@@ -131,6 +133,16 @@ class Simulation:
         match = find_best_memory_match(creature, sense, self.config.match_threshold)
         if match is not None:
             mem_idx, step_idx, score = match
+
+            # If the same memory fired last tick, force one explore step to break loops.
+            if creature.last_replayed_memory_idx == mem_idx:
+                creature.last_replay_fail_reason = "repeated memory — forced explore"
+                creature.last_replayed_memory_idx = None
+                creature.active_memory_idx = None
+                creature.active_step_idx = None
+                self._explore(creature, sense, pos)
+                return
+
             mem_seq = creature.memories[mem_idx]
             action = mem_seq.steps[step_idx].action
             new_pos = self.world.move_pos(pos, action)
@@ -138,12 +150,14 @@ class Simulation:
 
             if action != Action.IDLE and target_tile == Tile.WALL:
                 creature.last_replay_fail_reason = "blocked by wall"
+                creature.last_replayed_memory_idx = None
                 creature.active_memory_idx = None
                 creature.active_step_idx = None
                 self._explore(creature, sense, pos)
                 return
             elif action != Action.IDLE and target_tile == Tile.CREATURE:
                 creature.last_replay_fail_reason = "blocked by creature"
+                creature.last_replayed_memory_idx = None
                 creature.active_memory_idx = None
                 creature.active_step_idx = None
                 self._explore(creature, sense, pos)
@@ -153,12 +167,14 @@ class Simulation:
             creature.last_replay_fail_reason = ""
             creature.active_memory_idx = mem_idx
             creature.active_step_idx = step_idx
+            creature.last_replayed_memory_idx = mem_idx
             self._execute_move(creature, action, sense, CreatureMode.MEMORY_REPLAY)
             return
 
         # 4. Explore
         creature.active_memory_idx = None
         creature.active_step_idx = None
+        creature.last_replayed_memory_idx = None
         self._explore(creature, sense, pos)
 
     def _explore(self, creature: Creature, sense: list[int], pos: Position) -> None:
@@ -256,6 +272,7 @@ class Simulation:
             creature.recent_steps = []
             creature.active_memory_idx = None
             creature.active_step_idx = None
+            creature.last_replayed_memory_idx = None
             creature.current_sense_vector = []
             creature.current_action = None
 
