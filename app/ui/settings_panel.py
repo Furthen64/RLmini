@@ -42,6 +42,11 @@ class SettingsPanel(QWidget):
         self.sb_food.setValue(20)
         form.addRow("Food Count:", self.sb_food)
 
+        self.sb_walls = QSpinBox()
+        self.sb_walls.setRange(0, 200)
+        self.sb_walls.setValue(10)
+        form.addRow("Wall Count:", self.sb_walls)
+
         self.sb_epoch_len = QSpinBox()
         self.sb_epoch_len.setRange(10, 10000)
         self.sb_epoch_len.setValue(200)
@@ -107,6 +112,7 @@ class SettingsPanel(QWidget):
             "world_height": self.sb_height.value(),
             "creature_count": self.sb_creatures.value(),
             "food_count": self.sb_food.value(),
+            "wall_count": self.sb_walls.value(),
             "epoch_length": self.sb_epoch_len.value(),
             "tick_interval_ms": self.sb_tick_ms.value(),
             "match_threshold": self.dsb_threshold.value(),
@@ -124,6 +130,7 @@ class SettingsPanel(QWidget):
         self.sb_height.setValue(settings.get("world_height", 15))
         self.sb_creatures.setValue(settings.get("creature_count", 5))
         self.sb_food.setValue(settings.get("food_count", 20))
+        self.sb_walls.setValue(settings.get("wall_count", 10))
         self.sb_epoch_len.setValue(settings.get("epoch_length", 200))
         self.sb_tick_ms.setValue(settings.get("tick_interval_ms", 100))
         self.dsb_threshold.setValue(settings.get("match_threshold", 0.75))

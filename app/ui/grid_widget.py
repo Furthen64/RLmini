@@ -2,13 +2,14 @@ from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPainter, QColor, QPen, QFont, QMouseEvent, QPaintEvent
 
-from app.enums import Tile
+from app.enums import Tile, CreatureMode
 from app.models import Creature
 
 WALL_COLOR = QColor(90, 90, 100)
 EMPTY_COLOR = QColor(30, 30, 35)
 FOOD_COLOR = QColor(100, 220, 80)
 CREATURE_COLOR = QColor(80, 160, 240)
+MEMORY_COLOR = QColor(160, 80, 230)
 SELECTED_COLOR = QColor(255, 220, 0)
 GRID_LINE_COLOR = QColor(60, 60, 70)
 
@@ -94,7 +95,12 @@ class GridWidget(QWidget):
                 and self.selected_creature is not None
                 and self.selected_creature.id == creature.id
             )
-            color = SELECTED_COLOR if is_selected else CREATURE_COLOR
+            if is_selected:
+                color = SELECTED_COLOR
+            elif creature.mode == CreatureMode.MEMORY_REPLAY:
+                color = MEMORY_COLOR
+            else:
+                color = CREATURE_COLOR
 
             painter.setBrush(color)
             painter.setPen(Qt.PenStyle.NoPen)
