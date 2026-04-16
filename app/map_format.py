@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
@@ -187,6 +188,55 @@ def map_document_from_world(
         spawn_positions=[Position(pos.row, pos.col) for pos in (spawn_positions or [])],
         metadata={"name": name} if name else {},
     )
+    return normalize_map_document(doc)
+
+
+def generate_maze_map(
+    width: int,
+    height: int,
+    *,
+    name: str | None = None,
+    rng: random.Random | None = None,
+) -> MapDocument:
+    maze_rng = rng if rng is not None else random.Random()
+    doc = create_empty_map(width, height, name=name)
+
+    for row in range(1, height - 1):
+        for col in range(1, width - 1):
+            doc.terrain[row][col] = MAP_WALL
+
+    max_row = height - 2
+    max_col = width - 2
+    start_row = 1
+    start_col = 1
+    doc.terrain[start_row][start_col] = MAP_EMPTY
+    stack: list[tuple[int, int]] = [(start_row, start_col)]
+    directions = [(-2, 0), (2, 0), (0, -2), (0, 2)]
+
+    while stack:
+        row, col = stack[-1]
+        neighbors: list[tuple[int, int, int, int]] = []
+        for dr, dc in directions:
+            next_row = row + dr
+            next_col = col + dc
+            if not (1 <= next_row <= max_row and 1 <= next_col <= max_col):
+                continue
+            if doc.terrain[next_row][next_col] != MAP_WALL:
+                continue
+            wall_row = row + (dr // 2)
+            wall_col = col + (dc // 2)
+            neighbors.append((next_row, next_col, wall_row, wall_col))
+
+        if not neighbors:
+            stack.pop()
+            continue
+
+        next_row, next_col, wall_row, wall_col = maze_rng.choice(neighbors)
+        doc.terrain[wall_row][wall_col] = MAP_EMPTY
+        doc.terrain[next_row][next_col] = MAP_EMPTY
+        stack.append((next_row, next_col))
+
+    doc.spawn_positions = []
     return normalize_map_document(doc)
 
 

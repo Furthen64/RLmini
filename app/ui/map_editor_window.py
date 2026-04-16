@@ -28,6 +28,7 @@ from app.map_format import (
     MAP_WALL,
     MapDocument,
     create_empty_map,
+    generate_maze_map,
     load_map_document,
     save_map_document,
 )
@@ -37,6 +38,7 @@ from app.ui.map_editor_widget import MapEditorWidget
 
 class MapEditorWindow(QMainWindow):
     map_applied = Signal(object)
+    MIN_MAZE_SIZE = 24
 
     def __init__(
         self,
@@ -82,6 +84,7 @@ class MapEditorWindow(QMainWindow):
         self.btn_save = QPushButton("Save")
         self.btn_save_as = QPushButton("Save As")
         self.btn_resize = QPushButton("Resize")
+        self.btn_generate_maze = QPushButton("Generate Maze")
         self.btn_apply = QPushButton("Apply To RLmini")
         self.btn_apply.setVisible(self.allow_apply)
 
@@ -106,6 +109,7 @@ class MapEditorWindow(QMainWindow):
         top_row.addWidget(QLabel("Height:"))
         top_row.addWidget(self.sb_height)
         top_row.addWidget(self.btn_resize)
+        top_row.addWidget(self.btn_generate_maze)
         top_row.addWidget(self.btn_apply)
         layout.addLayout(top_row)
 
@@ -146,6 +150,7 @@ class MapEditorWindow(QMainWindow):
         self.btn_save.clicked.connect(self._save_map)
         self.btn_save_as.clicked.connect(self._save_map_as)
         self.btn_resize.clicked.connect(self._resize_map)
+        self.btn_generate_maze.clicked.connect(self._generate_maze)
         self.btn_apply.clicked.connect(self._apply_map)
         self.tool_group.idClicked.connect(self.editor.set_tool)
         self.name_edit.editingFinished.connect(self._commit_name)
@@ -169,6 +174,12 @@ class MapEditorWindow(QMainWindow):
         save_as_action = QAction("Save As...", self)
         save_as_action.triggered.connect(self._save_map_as)
         file_menu.addAction(save_as_action)
+
+        tools_menu = self.menuBar().addMenu("Tools")
+
+        generate_maze_action = QAction("Generate Maze", self)
+        generate_maze_action.triggered.connect(self._generate_maze)
+        tools_menu.addAction(generate_maze_action)
 
         if self.allow_apply:
             apply_action = QAction("Apply To RLmini", self)
@@ -257,6 +268,26 @@ class MapEditorWindow(QMainWindow):
         self.editor.resize_document(self.sb_width.value(), self.sb_height.value())
         self._set_status(
             f"Resized map to {self.editor.document.width}x{self.editor.document.height}"
+        )
+
+    def _generate_maze(self) -> None:
+        doc = self.editor.document
+        if doc.width < self.MIN_MAZE_SIZE or doc.height < self.MIN_MAZE_SIZE:
+            QMessageBox.warning(
+                self,
+                "Map too small",
+                f"Generate Maze requires a map of at least {self.MIN_MAZE_SIZE}x{self.MIN_MAZE_SIZE}.",
+            )
+            return
+
+        maze_doc = generate_maze_map(
+            doc.width,
+            doc.height,
+            name=doc.metadata.get("name") or "untitled",
+        )
+        self.load_document(maze_doc, mark_clean=False, current_path=self.current_path)
+        self._set_status(
+            f"Generated maze for {maze_doc.width}x{maze_doc.height} map"
         )
 
     def _commit_name(self) -> None:
