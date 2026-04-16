@@ -45,6 +45,11 @@ class World:
             raise ValueError(f"Coordinates ({row}, {col}) are out of bounds.")
         return self.grid[row][col]
 
+    def _sample_tile(self, row: int, col: int) -> int:
+        if not self.in_bounds(row, col):
+            return Tile.WALL
+        return self.grid[row][col]
+
     def set_tile(self, row: int, col: int, tile: int) -> None:
         if not self.in_bounds(row, col):
             raise ValueError(f"Coordinates ({row}, {col}) are out of bounds.")
@@ -52,7 +57,7 @@ class World:
 
     def get_sense_vector(self, pos: Position) -> list[int]:
         return [
-            self.get_tile(pos.row + dr, pos.col + dc)
+            self._sample_tile(pos.row + dr, pos.col + dc)
             for dr, dc in self.sense_offsets
         ]
 
@@ -60,7 +65,7 @@ class World:
         result = []
         for action, (dr, dc) in CARDINAL_OFFSETS.items():
             nr, nc = pos.row + dr, pos.col + dc
-            if self.get_tile(nr, nc) == Tile.FOOD:
+            if self._sample_tile(nr, nc) == Tile.FOOD:
                 result.append((nr, nc))
         return result
 
@@ -68,7 +73,7 @@ class World:
         result = []
         for dr, dc in self.sense_offsets:
             nr, nc = pos.row + dr, pos.col + dc
-            if self.get_tile(nr, nc) == Tile.FOOD:
+            if self._sample_tile(nr, nc) == Tile.FOOD:
                 result.append((nr, nc))
         return result
 
@@ -76,7 +81,7 @@ class World:
         legal = []
         for action, (dr, dc) in CARDINAL_OFFSETS.items():
             nr, nc = pos.row + dr, pos.col + dc
-            tile = self.get_tile(nr, nc)
+            tile = self._sample_tile(nr, nc)
             if tile in (Tile.EMPTY, Tile.FOOD):
                 legal.append(int(action))
         return legal
