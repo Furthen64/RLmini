@@ -101,6 +101,19 @@ def try_create_memory(
     if not candidate_steps_raw:
         return None
 
+    # Snip any all-empty sense vector step and everything that preceded it.
+    # An all-empty sense vector carries no positional information and is what
+    # causes creatures to learn degenerate "go LEFT in open space" habits.
+    last_empty_idx = -1
+    for i, (_, sv, _) in enumerate(candidate_steps_raw):
+        if not any(sv):
+            last_empty_idx = i
+    if last_empty_idx >= 0:
+        candidate_steps_raw = candidate_steps_raw[last_empty_idx + 1:]
+
+    if not candidate_steps_raw:
+        return None
+
     positions = [p for p, sv, a in candidate_steps_raw]
     steps = [MemoryStep(sense_vector=list(sv), action=a) for p, sv, a in candidate_steps_raw]
 
