@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from app.config import SETTINGS_VERSION
+from app.config import SETTINGS_VERSION, DEFAULT_RNG_SEED
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "tick_interval_ms": 100,
     "match_threshold": 0.75,
     "cell_size": 32,
-    "seed": 42,
+    "seed": DEFAULT_RNG_SEED,
     "seed_fixed": False,
     "auto_run": False,
     "show_grid_lines": True,

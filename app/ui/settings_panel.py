@@ -4,6 +4,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal
 
+from app.config import DEFAULT_RNG_SEED
+
 
 class SettingsPanel(QWidget):
     save_requested = Signal()
@@ -127,7 +129,7 @@ class SettingsPanel(QWidget):
         self.dsb_threshold.setValue(settings.get("match_threshold", 0.75))
         self.sb_cell_size.setValue(settings.get("cell_size", 32))
         seed_val = settings.get("seed")
-        self.sb_seed.setValue(seed_val if isinstance(seed_val, int) else 42)
+        self.sb_seed.setValue(seed_val if isinstance(seed_val, int) else DEFAULT_RNG_SEED)
         self.cb_fixed_seed.setChecked(bool(settings.get("seed_fixed", False)))
         self.cb_auto_run.setChecked(bool(settings.get("auto_run", False)))
         self.cb_grid_lines.setChecked(bool(settings.get("show_grid_lines", True)))

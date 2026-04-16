@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPainter, QColor, QPen, QFont, QMouseEvent
+from PySide6.QtGui import QPainter, QColor, QPen, QFont, QMouseEvent, QPaintEvent
 
 from app.enums import Tile
 from app.models import Creature
@@ -51,7 +51,7 @@ class GridWidget(QWidget):
         self._update_size()
         self.update()
 
-    def paintEvent(self, event: object) -> None:  # type: ignore[override]
+    def paintEvent(self, event: QPaintEvent) -> None:
         if self.world is None:
             return
         painter = QPainter(self)
