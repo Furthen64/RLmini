@@ -61,7 +61,7 @@ class DetailsWindow(QWidget):
         layout.addWidget(state_group)
 
         # Sense vector
-        sense_group = QGroupBox("Sense Vector (NW,N,NE,W,E,SW,S,SE)")
+        sense_group = QGroupBox("Sense Vector")
         sense_layout = QVBoxLayout(sense_group)
         self.sense_label = QLabel("-")
         self.sense_label.setWordWrap(True)

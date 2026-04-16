@@ -11,7 +11,7 @@ class Simulation:
     def __init__(self, config: WorldConfig, rng_seed: Optional[int] = None) -> None:
         self.config = config
         self.rng = random.Random(rng_seed)
-        self.world = World(config.width, config.height)
+        self.world = World(config.width, config.height, config.sense_radius)
         self.creatures: list[Creature] = []
         self.stats = SimulationStats()
         self._next_creature_id = 0

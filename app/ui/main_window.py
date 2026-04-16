@@ -138,6 +138,7 @@ class MainWindow(QMainWindow):
             tick_interval_ms=s.get("tick_interval_ms", 100),
             match_threshold=s.get("match_threshold", 0.75),
             cell_size=s.get("cell_size", 32),
+            sense_radius=s.get("sense_radius", 1),
         )
         if s.get("seed_fixed"):
             seed: Optional[int] = s.get("seed")

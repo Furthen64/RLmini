@@ -13,7 +13,10 @@ REVERSAL_PAIRS: set[tuple[int, int]] = {
 
 
 def sense_match_score(a: list[int], b: list[int]) -> float:
-    return sum(x == y for x, y in zip(a, b)) / 8.0
+    n = len(a)
+    if n == 0:
+        return 0.0
+    return sum(x == y for x, y in zip(a, b)) / n
 
 
 def _is_empty_sense(step: MemoryStep) -> bool:
