@@ -3,7 +3,7 @@ from typing import Optional
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QSplitter, QScrollArea, QStatusBar, QLabel,
+    QSplitter, QScrollArea, QStatusBar, QLabel, QMessageBox,
 )
 from PySide6.QtCore import Qt, QTimer, QByteArray
 from PySide6.QtGui import QCloseEvent
@@ -16,6 +16,7 @@ from app.ui.grid_widget import GridWidget
 from app.ui.details_window import DetailsWindow
 from app.ui.settings_panel import SettingsPanel
 from app.ui.controls_panel import ControlsPanel
+from app.ui.stats_graph import StatsGraph
 
 
 class MainWindow(QMainWindow):
@@ -27,6 +28,7 @@ class MainWindow(QMainWindow):
         self.selected_creature: Optional[Creature] = None
         self._running = False
         self._tick_count_this_epoch = 0
+        self._last_status_text = ""
 
         self._build_ui()
         self._apply_settings_to_ui()
@@ -64,7 +66,11 @@ class MainWindow(QMainWindow):
         self.grid_widget = GridWidget()
         self.grid_widget.creature_selected.connect(self._on_creature_selected)
         self.scroll.setWidget(self.grid_widget)
-        left_layout.addWidget(self.scroll)
+        left_layout.addWidget(self.scroll, 1)
+
+        # Stats graph below the grid
+        self.stats_graph = StatsGraph()
+        left_layout.addWidget(self.stats_graph, 0)
 
         # Right: settings panel
         self.settings_panel = SettingsPanel()
@@ -128,12 +134,28 @@ class MainWindow(QMainWindow):
 
     def _init_simulation(self) -> None:
         s = self.settings
+        w = s.get("world_width", 20)
+        h = s.get("world_height", 15)
+        interior = (w - 2) * (h - 2)
+        creature_n = s.get("creature_count", 5)
+        food_n = s.get("food_count", 20)
+        wall_n = s.get("wall_count", 10)
+        total = creature_n + food_n + wall_n
+        if total > interior:
+            QMessageBox.warning(
+                self,
+                "Invalid settings",
+                f"creatures ({creature_n}) + food ({food_n}) + walls ({wall_n}) "
+                f"= {total} exceeds interior cells ({interior}).\n"
+                f"Reduce counts or increase grid size.",
+            )
+            return
         config = WorldConfig(
-            width=s.get("world_width", 20),
-            height=s.get("world_height", 15),
-            creature_count=s.get("creature_count", 5),
-            food_count=s.get("food_count", 20),
-            wall_count=s.get("wall_count", 10),
+            width=w,
+            height=h,
+            creature_count=creature_n,
+            food_count=food_n,
+            wall_count=wall_n,
             epoch_length=s.get("epoch_length", 200),
             tick_interval_ms=s.get("tick_interval_ms", 100),
             match_threshold=s.get("match_threshold", 0.75),
@@ -149,6 +171,7 @@ class MainWindow(QMainWindow):
         self.grid_widget.set_world(self.simulation.world, self.simulation.creatures)
         self.selected_creature = None
         self.details_window.update_creature(None)
+        self.stats_graph.clear()
         self._tick_count_this_epoch = 0
         self._update_status()
 
@@ -184,6 +207,9 @@ class MainWindow(QMainWindow):
             self._auto_epoch_end()
         else:
             self._update_ui()
+            # Use dirty-rect refresh with changed cells from the world
+            changed = self.simulation.world.take_changed_cells()
+            self.grid_widget.refresh_dirty(changed)
 
     def _auto_epoch_end(self) -> None:
         if self.simulation is None:
@@ -204,7 +230,9 @@ class MainWindow(QMainWindow):
         self.selected_creature = None
         self.grid_widget.selected_creature = None
         self.details_window.update_creature(None)
+        self.simulation.world.take_changed_cells()  # drain
         self._update_ui()
+        self.grid_widget.refresh()
 
     def _reset_epoch(self) -> None:
         if self.simulation is None:
@@ -214,7 +242,9 @@ class MainWindow(QMainWindow):
         self.selected_creature = None
         self.grid_widget.selected_creature = None
         self.details_window.update_creature(None)
+        self.simulation.world.take_changed_cells()  # drain
         self._update_ui()
+        self.grid_widget.refresh()
 
     def _reset_sim(self) -> None:
         was_running = self._running
@@ -245,7 +275,7 @@ class MainWindow(QMainWindow):
             self.details_window.update_creature(found)
 
         self.grid_widget.creatures = self.simulation.creatures
-        self.grid_widget.refresh()
+        self.stats_graph.update_data(self.simulation.history)
         self._update_status()
 
     def _update_status(self) -> None:
@@ -258,12 +288,17 @@ class MainWindow(QMainWindow):
             if self.selected_creature
             else ""
         )
-        self.status_label.setText(
+        text = (
             f"Tick: {stats.tick}  |  Epoch: {stats.epoch}  |  "
             f"Creatures: {stats.creature_count}  |  "
             f"Food remaining: {stats.food_remaining}  |  "
-            f"Food consumed: {stats.food_consumed}{sel}"
+            f"Food consumed: {stats.food_consumed}  |  "
+            f"Best: {stats.best_creature_score}  |  "
+            f"Avg: {stats.avg_creature_score:.1f}{sel}"
         )
+        if text != self._last_status_text:
+            self._last_status_text = text
+            self.status_label.setText(text)
 
     # ----------------------------------------------------------------- close
 

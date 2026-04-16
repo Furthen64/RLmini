@@ -36,13 +36,15 @@ class World:
         self.grid: list[list[int]] = [
             [Tile.EMPTY] * width for _ in range(height)
         ]
+        self._food_count: int = 0
+        self._changed_cells: list[tuple[int, int]] = []
 
     def in_bounds(self, row: int, col: int) -> bool:
         return 0 <= row < self.height and 0 <= col < self.width
 
     def get_tile(self, row: int, col: int) -> int:
         if not self.in_bounds(row, col):
-            raise ValueError(f"Coordinates ({row}, {col}) are out of bounds.")
+            return Tile.WALL
         return self.grid[row][col]
 
     def _sample_tile(self, row: int, col: int) -> int:
@@ -52,8 +54,16 @@ class World:
 
     def set_tile(self, row: int, col: int, tile: int) -> None:
         if not self.in_bounds(row, col):
-            raise ValueError(f"Coordinates ({row}, {col}) are out of bounds.")
+            return
+        old = self.grid[row][col]
+        if old == tile:
+            return
+        if old == Tile.FOOD:
+            self._food_count -= 1
+        if tile == Tile.FOOD:
+            self._food_count += 1
         self.grid[row][col] = tile
+        self._changed_cells.append((row, col))
 
     def get_sense_vector(self, pos: Position) -> list[int]:
         return [
@@ -93,9 +103,9 @@ class World:
         return Position(pos.row + dr, pos.col + dc)
 
     def count_food(self) -> int:
-        count = 0
-        for row in self.grid:
-            for tile in row:
-                if tile == Tile.FOOD:
-                    count += 1
-        return count
+        return self._food_count
+
+    def take_changed_cells(self) -> list[tuple[int, int]]:
+        changes = self._changed_cells
+        self._changed_cells = []
+        return changes

@@ -36,6 +36,7 @@ class DetailsWindow(QWidget):
         self.setWindowTitle("Creature Details")
         self.setMinimumSize(360, 520)
         self.creature: Creature | None = None
+        self._last_update_key: tuple | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -106,6 +107,7 @@ class DetailsWindow(QWidget):
     def update_creature(self, creature: Creature | None) -> None:
         self.creature = creature
         if creature is None:
+            self._last_update_key = None
             self.title_label.setText("No creature selected")
             self.pos_label.setText("Position: -")
             self.mode_label.setText("Mode: -")
@@ -119,6 +121,16 @@ class DetailsWindow(QWidget):
             self.active_mem_label.setText("-")
             self.memories_text.setPlainText("")
             return
+
+        # Skip full refresh if creature state is unchanged
+        key = (
+            creature.id, creature.position.row, creature.position.col,
+            creature.mode, creature.current_action, creature.food_score,
+            creature.active_memory_idx, len(creature.memories),
+        )
+        if key == self._last_update_key:
+            return
+        self._last_update_key = key
 
         self.title_label.setText(f"Creature #{creature.id}")
         self.pos_label.setText(f"Position: ({creature.position.row}, {creature.position.col})")

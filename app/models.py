@@ -68,9 +68,19 @@ class WorldConfig:
 
 
 @dataclass
+class TickSnapshot:
+    tick: int
+    food_remaining: int
+    best_score: int
+    avg_score: float
+
+
+@dataclass
 class SimulationStats:
     tick: int = 0
     epoch: int = 0
     food_remaining: int = 0
     food_consumed: int = 0
     creature_count: int = 0
+    best_creature_score: int = 0
+    avg_creature_score: float = 0.0

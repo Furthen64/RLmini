@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPainter, QColor, QPen, QFont, QMouseEvent, QPaintEvent
+from PySide6.QtCore import Qt, Signal, QRect
+from PySide6.QtGui import QPainter, QColor, QPen, QFont, QMouseEvent, QPaintEvent, QRegion
 
 from app.enums import Tile, CreatureMode
 from app.models import Creature
@@ -26,6 +26,7 @@ class GridWidget(QWidget):
         self.show_grid_lines = True
         self.show_creature_ids = True
         self.highlight_selected = True
+        self._prev_creature_cells: set[tuple[int, int]] = set()
         self.setMinimumSize(200, 200)
 
     def set_world(self, world: object, creatures: list[Creature]) -> None:
@@ -36,6 +37,29 @@ class GridWidget(QWidget):
 
     def refresh(self) -> None:
         self.update()
+
+    def refresh_dirty(self, changed_cells: list[tuple[int, int]]) -> None:
+        """Request repaint only for the given cells plus creature movement."""
+        if self.world is None:
+            self.update()
+            return
+        cs = self.cell_size
+        total = self.world.width * self.world.height
+
+        # Collect current creature cells
+        cur_creature_cells = {(c.position.row, c.position.col) for c in self.creatures}
+        # Cells that need repaint: changed tiles + old creature positions + new creature positions
+        dirty = set(changed_cells) | self._prev_creature_cells | cur_creature_cells
+        self._prev_creature_cells = cur_creature_cells
+
+        if len(dirty) > total // 2:
+            self.update()
+            return
+
+        region = QRegion()
+        for row, col in dirty:
+            region += QRegion(QRect(col * cs, row * cs, cs, cs))
+        self.update(region)
 
     def _update_size(self) -> None:
         if self.world is not None:
@@ -58,10 +82,17 @@ class GridWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         cs = self.cell_size
+        clip = event.rect()
 
-        # Draw background tiles
-        for row in range(self.world.height):
-            for col in range(self.world.width):
+        # Determine visible cell range from clip rect
+        col_min = max(0, clip.left() // cs)
+        col_max = min(self.world.width - 1, clip.right() // cs)
+        row_min = max(0, clip.top() // cs)
+        row_max = min(self.world.height - 1, clip.bottom() // cs)
+
+        # Draw background tiles (only visible cells)
+        for row in range(row_min, row_max + 1):
+            for col in range(col_min, col_max + 1):
                 tile = self.world.get_tile(row, col)
                 x, y = col * cs, row * cs
 
@@ -79,7 +110,7 @@ class GridWidget(QWidget):
                 else:
                     painter.fillRect(x, y, cs, cs, EMPTY_COLOR)
 
-        # Draw creatures
+        # Draw creatures (only those in clip region)
         font = QFont()
         font.setPixelSize(max(8, cs // 3))
         font.setBold(True)
@@ -88,6 +119,8 @@ class GridWidget(QWidget):
         for creature in self.creatures:
             row = creature.position.row
             col = creature.position.col
+            if row < row_min or row > row_max or col < col_min or col > col_max:
+                continue
             x, y = col * cs, row * cs
 
             is_selected = (
@@ -119,15 +152,21 @@ class GridWidget(QWidget):
                     str(creature.id),
                 )
 
-        # Grid lines
+        # Grid lines (only within clip)
         if self.show_grid_lines:
             pen = QPen(GRID_LINE_COLOR)
             pen.setWidth(1)
             painter.setPen(pen)
-            for row in range(self.world.height + 1):
-                painter.drawLine(0, row * cs, self.world.width * cs, row * cs)
-            for col in range(self.world.width + 1):
-                painter.drawLine(col * cs, 0, col * cs, self.world.height * cs)
+            x_left = col_min * cs
+            x_right = (col_max + 1) * cs
+            y_top = row_min * cs
+            y_bottom = (row_max + 1) * cs
+            for row in range(row_min, row_max + 2):
+                ry = row * cs
+                painter.drawLine(x_left, ry, x_right, ry)
+            for col in range(col_min, col_max + 2):
+                cx = col * cs
+                painter.drawLine(cx, y_top, cx, y_bottom)
 
         painter.end()
 

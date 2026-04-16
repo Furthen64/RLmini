@@ -2,7 +2,7 @@ import random
 from typing import Optional
 
 from app.enums import Tile, Action, CreatureMode
-from app.models import Position, Creature, WorldConfig, SimulationStats
+from app.models import Position, Creature, WorldConfig, SimulationStats, TickSnapshot
 from app.world import World, CARDINAL_OFFSETS
 from app.memory import find_best_memory_match, try_create_memory
 
@@ -20,6 +20,7 @@ class Simulation:
         self.world = World(config.width, config.height, config.sense_radius)
         self.creatures: list[Creature] = []
         self.stats = SimulationStats()
+        self.history: list[TickSnapshot] = []
         self._next_creature_id = 0
         self._initialize()
 
@@ -78,6 +79,13 @@ class Simulation:
     def _update_stats(self) -> None:
         self.stats.food_remaining = self.world.count_food()
         self.stats.creature_count = len(self.creatures)
+        if self.creatures:
+            scores = [c.food_score for c in self.creatures]
+            self.stats.best_creature_score = max(scores)
+            self.stats.avg_creature_score = sum(scores) / len(scores)
+        else:
+            self.stats.best_creature_score = 0
+            self.stats.avg_creature_score = 0.0
 
     def tick(self) -> None:
         order = list(self.creatures)
@@ -86,6 +94,12 @@ class Simulation:
             self._tick_creature(creature)
         self.stats.tick += 1
         self._update_stats()
+        self.history.append(TickSnapshot(
+            tick=self.stats.tick,
+            food_remaining=self.stats.food_remaining,
+            best_score=self.stats.best_creature_score,
+            avg_score=self.stats.avg_creature_score,
+        ))
 
     def _tick_creature(self, creature: Creature) -> None:
         self._tick_down_memory_cooldowns(creature)
@@ -436,6 +450,11 @@ class Simulation:
         new_pos = self.world.move_pos(pos, action)
 
         if action != Action.IDLE:
+            # Check if target tile is food (pickup via explore / memory replay)
+            target_tile = self.world.get_tile(new_pos.row, new_pos.col)
+            if target_tile == Tile.FOOD:
+                creature.food_score += 1
+                self.stats.food_consumed += 1
             self.world.set_tile(pos.row, pos.col, Tile.EMPTY)
             self.world.set_tile(new_pos.row, new_pos.col, Tile.CREATURE)
             creature.position = new_pos
@@ -477,6 +496,7 @@ class Simulation:
         self.stats.epoch += 1
         self.stats.tick = 0
         self.stats.food_consumed = 0
+        self.history = []
 
         # Clear non-wall tiles
         for row in range(self.config.height):

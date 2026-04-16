@@ -108,13 +108,9 @@ def try_create_memory(
     if not candidate_steps_raw:
         return None
 
-    # Consolidate redundant checks
+    # Remove steps with all-empty sense vectors (no informational value)
     def filter_empty_steps(steps):
-        last_empty_idx = -1
-        for i, step in enumerate(steps):
-            if not any(step[1]):
-                last_empty_idx = i
-        return steps[last_empty_idx + 1:] if last_empty_idx >= 0 else steps
+        return [step for step in steps if any(step[1])]
 
     candidate_steps_raw = filter_empty_steps(candidate_steps_raw)
 
