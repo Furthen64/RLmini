@@ -1,6 +1,7 @@
 import random
 
 from app.models import Creature, MemorySequence, Position
+from app.config import ReproductionConfig
 
 
 def select_parents(creatures: list[Creature], top_n: int) -> list[Creature]:
@@ -34,7 +35,7 @@ def reproduce(
     target_count: int,
     next_id_start: int,
     rng: random.Random,
-    top_fraction: float = 0.5,
+    top_fraction: float = ReproductionConfig.TOP_FRACTION,
 ) -> list[Creature]:
     top_n = max(1, int(len(creatures) * top_fraction))
     parents = select_parents(creatures, top_n)

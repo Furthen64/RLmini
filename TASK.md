@@ -1,5 +1,9 @@
 # TASK.md
 
+This was the original TASK.md file that generated the absolute first version of the code.
+Since then it's probably changed, so maybe delete this entire file.
+
+
 ## Project goal
 
 Build a **Python 3.12** desktop application using **Qt Widgets** that simulates a 2D grid world with:

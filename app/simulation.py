@@ -134,6 +134,18 @@ class Simulation:
         if match is not None:
             mem_idx, step_idx, score = match
 
+            # Validate memory indices
+            if mem_idx < 0 or mem_idx >= len(creature.memories):
+                creature.last_replay_fail_reason = "invalid memory index"
+                self._explore(creature, sense, pos)
+                return
+
+            mem_seq = creature.memories[mem_idx]
+            if step_idx < 0 or step_idx >= len(mem_seq.steps):
+                creature.last_replay_fail_reason = "invalid step index"
+                self._explore(creature, sense, pos)
+                return
+
             # If the same memory fired last tick, force one explore step to break loops.
             if creature.last_replayed_memory_idx == mem_idx:
                 creature.last_replay_fail_reason = "repeated memory — forced explore"
@@ -143,11 +155,9 @@ class Simulation:
                 self._explore(creature, sense, pos)
                 return
 
-            mem_seq = creature.memories[mem_idx]
             action = mem_seq.steps[step_idx].action
             new_pos = self.world.move_pos(pos, action)
             target_tile = self.world.get_tile(new_pos.row, new_pos.col)
-
             if action != Action.IDLE and target_tile == Tile.WALL:
                 creature.last_replay_fail_reason = "blocked by wall"
                 creature.last_replayed_memory_idx = None
@@ -204,6 +214,12 @@ class Simulation:
     def _execute_move(
         self, creature: Creature, action: int, sense: list[int], mode: int
     ) -> None:
+        # Preserve the previous current_action before updating it
+        creature.last_action = creature.current_action
+        creature.current_action = action
+
+        # Update the mode and position
+        creature.mode = mode
         pos = creature.position
         new_pos = self.world.move_pos(pos, action)
 
@@ -212,10 +228,7 @@ class Simulation:
             self.world.set_tile(new_pos.row, new_pos.col, Tile.CREATURE)
             creature.position = new_pos
 
-        creature.mode = mode
-        creature.current_action = action
-        creature.last_action = action
-
+        # Append the step to recent_steps
         creature.recent_steps.append((pos, list(sense), action, creature.active_memory_idx))
         if len(creature.recent_steps) > 4:
             creature.recent_steps.pop(0)

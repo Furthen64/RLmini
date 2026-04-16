@@ -1,5 +1,6 @@
 import random
 from typing import Optional
+from threading import Thread
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
@@ -172,7 +173,12 @@ class MainWindow(QMainWindow):
     def _auto_tick(self) -> None:
         if self.simulation is None:
             return
-        self._do_tick()
+
+        def run_tick():
+            self._do_tick()
+
+        tick_thread = Thread(target=run_tick)
+        tick_thread.start()
 
     def _do_tick(self) -> None:
         if self.simulation is None:

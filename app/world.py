@@ -42,12 +42,13 @@ class World:
 
     def get_tile(self, row: int, col: int) -> int:
         if not self.in_bounds(row, col):
-            return Tile.WALL
+            raise ValueError(f"Coordinates ({row}, {col}) are out of bounds.")
         return self.grid[row][col]
 
     def set_tile(self, row: int, col: int, tile: int) -> None:
-        if self.in_bounds(row, col):
-            self.grid[row][col] = tile
+        if not self.in_bounds(row, col):
+            raise ValueError(f"Coordinates ({row}, {col}) are out of bounds.")
+        self.grid[row][col] = tile
 
     def get_sense_vector(self, pos: Position) -> list[int]:
         return [
