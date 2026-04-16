@@ -39,6 +39,7 @@ class Creature:
     recent_steps: list = field(default_factory=list)  # list of (Position, list[int], int)
     active_memory_idx: Optional[int] = None
     active_step_idx: Optional[int] = None
+    last_replayed_memory_idx: Optional[int] = None
     current_sense_vector: list[int] = field(default_factory=list)
     current_action: Optional[int] = None
 
