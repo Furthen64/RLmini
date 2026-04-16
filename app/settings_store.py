@@ -37,6 +37,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "show_grid_lines": True,
     "show_creature_ids": True,
     "highlight_selected": True,
+    "sense_radius": 1,
     "main_window_geometry": None,
     "details_window_geometry": None,
 }

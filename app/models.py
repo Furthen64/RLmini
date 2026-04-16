@@ -16,7 +16,7 @@ class Position:
 
 @dataclass
 class MemoryStep:
-    sense_vector: list[int]  # length 8
+    sense_vector: list[int]  # length = (2*sense_radius+1)^2 - 1
     action: int
 
 
@@ -59,6 +59,7 @@ class WorldConfig:
     show_grid_lines: bool = True
     show_creature_ids: bool = True
     highlight_selected: bool = True
+    sense_radius: int = 1
 
 
 @dataclass

@@ -63,6 +63,14 @@ class SettingsPanel(QWidget):
         self.dsb_threshold.setValue(0.75)
         form.addRow("Match Threshold:", self.dsb_threshold)
 
+        self.sb_sense_radius = QSpinBox()
+        self.sb_sense_radius.setRange(1, 5)
+        self.sb_sense_radius.setValue(1)
+        self.sb_sense_radius.setToolTip(
+            "Sense radius (shells): 1 = 8 tiles, 2 = 24 tiles, 3 = 48 tiles, …"
+        )
+        form.addRow("Sense Radius (shells):", self.sb_sense_radius)
+
         self.sb_cell_size = QSpinBox()
         self.sb_cell_size.setRange(8, 128)
         self.sb_cell_size.setValue(32)
@@ -116,6 +124,7 @@ class SettingsPanel(QWidget):
             "epoch_length": self.sb_epoch_len.value(),
             "tick_interval_ms": self.sb_tick_ms.value(),
             "match_threshold": self.dsb_threshold.value(),
+            "sense_radius": self.sb_sense_radius.value(),
             "cell_size": self.sb_cell_size.value(),
             "seed": self.sb_seed.value(),
             "seed_fixed": self.cb_fixed_seed.isChecked(),
@@ -134,6 +143,7 @@ class SettingsPanel(QWidget):
         self.sb_epoch_len.setValue(settings.get("epoch_length", 200))
         self.sb_tick_ms.setValue(settings.get("tick_interval_ms", 100))
         self.dsb_threshold.setValue(settings.get("match_threshold", 0.75))
+        self.sb_sense_radius.setValue(settings.get("sense_radius", 1))
         self.sb_cell_size.setValue(settings.get("cell_size", 32))
         seed_val = settings.get("seed")
         self.sb_seed.setValue(seed_val if isinstance(seed_val, int) else DEFAULT_RNG_SEED)

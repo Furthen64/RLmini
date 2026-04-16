@@ -1,13 +1,6 @@
 from app.enums import Tile, Action
 from app.models import Position
 
-# Sense order: NW, N, NE, W, E, SW, S, SE
-SENSE_OFFSETS: list[tuple[int, int]] = [
-    (-1, -1), (-1, 0), (-1, 1),
-    (0, -1),           (0, 1),
-    (1, -1),  (1, 0),  (1, 1),
-]
-
 # Cardinal directions mapped to (row_delta, col_delta)
 CARDINAL_OFFSETS: dict[int, tuple[int, int]] = {
     Action.UP:    (-1, 0),
@@ -17,10 +10,29 @@ CARDINAL_OFFSETS: dict[int, tuple[int, int]] = {
 }
 
 
+def get_sense_offsets(radius: int) -> list[tuple[int, int]]:
+    """Return sense offsets for a square neighbourhood of the given radius.
+
+    Offsets are ordered row-major (top-left to bottom-right), skipping (0, 0).
+    radius=1 → 8 tiles (3×3 minus centre)
+    radius=2 → 24 tiles (5×5 minus centre)
+    radius=n → (2n+1)² − 1 tiles
+    """
+    offsets: list[tuple[int, int]] = []
+    for dr in range(-radius, radius + 1):
+        for dc in range(-radius, radius + 1):
+            if dr == 0 and dc == 0:
+                continue
+            offsets.append((dr, dc))
+    return offsets
+
+
 class World:
-    def __init__(self, width: int, height: int) -> None:
+    def __init__(self, width: int, height: int, sense_radius: int = 1) -> None:
         self.width = width
         self.height = height
+        self.sense_radius = sense_radius
+        self.sense_offsets: list[tuple[int, int]] = get_sense_offsets(sense_radius)
         self.grid: list[list[int]] = [
             [Tile.EMPTY] * width for _ in range(height)
         ]
@@ -40,7 +52,7 @@ class World:
     def get_sense_vector(self, pos: Position) -> list[int]:
         return [
             self.get_tile(pos.row + dr, pos.col + dc)
-            for dr, dc in SENSE_OFFSETS
+            for dr, dc in self.sense_offsets
         ]
 
     def get_cardinal_adjacent_food(self, pos: Position) -> list[tuple[int, int]]:
@@ -53,7 +65,7 @@ class World:
 
     def get_visible_food(self, pos: Position) -> list[tuple[int, int]]:
         result = []
-        for dr, dc in SENSE_OFFSETS:
+        for dr, dc in self.sense_offsets:
             nr, nc = pos.row + dr, pos.col + dc
             if self.get_tile(nr, nc) == Tile.FOOD:
                 result.append((nr, nc))
