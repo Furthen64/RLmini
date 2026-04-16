@@ -133,12 +133,16 @@ class MainWindow(QMainWindow):
             height=s.get("world_height", 15),
             creature_count=s.get("creature_count", 5),
             food_count=s.get("food_count", 20),
+            wall_count=s.get("wall_count", 10),
             epoch_length=s.get("epoch_length", 200),
             tick_interval_ms=s.get("tick_interval_ms", 100),
             match_threshold=s.get("match_threshold", 0.75),
             cell_size=s.get("cell_size", 32),
         )
-        seed: Optional[int] = s.get("seed") if s.get("seed_fixed") else None
+        if s.get("seed_fixed"):
+            seed: Optional[int] = s.get("seed")
+        else:
+            seed = random.randint(0, 999_999)
         self.simulation = Simulation(config, rng_seed=seed)
         self.grid_widget.apply_settings(self.settings)
         self.grid_widget.set_world(self.simulation.world, self.simulation.creatures)

@@ -49,6 +49,7 @@ class WorldConfig:
     height: int = 15
     creature_count: int = 5
     food_count: int = 20
+    wall_count: int = 10
     epoch_length: int = 200
     tick_interval_ms: int = 100
     match_threshold: float = 0.75

@@ -24,6 +24,7 @@ class Simulation:
         self._update_stats()
 
     def _place_walls(self) -> None:
+        # Border walls
         for row in range(self.config.height):
             for col in range(self.config.width):
                 if (
@@ -33,6 +34,17 @@ class Simulation:
                     or col == self.config.width - 1
                 ):
                     self.world.set_tile(row, col, Tile.WALL)
+
+        # Interior walls (random scatter)
+        interior = [
+            (r, c)
+            for r in range(1, self.config.height - 1)
+            for c in range(1, self.config.width - 1)
+            if self.world.get_tile(r, c) == Tile.EMPTY
+        ]
+        self.rng.shuffle(interior)
+        for r, c in interior[: self.config.wall_count]:
+            self.world.set_tile(r, c, Tile.WALL)
 
     def _empty_positions(self) -> list[tuple[int, int]]:
         return [
