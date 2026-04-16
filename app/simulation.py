@@ -2,6 +2,7 @@ import random
 from typing import Optional
 
 from app.enums import Tile, Action, CreatureMode
+from app.map_format import MAP_FOOD, MapDocument
 from app.models import Position, Creature, WorldConfig, SimulationStats, TickSnapshot
 from app.world import World, CARDINAL_OFFSETS
 from app.memory import find_best_memory_match, try_create_memory
@@ -14,7 +15,12 @@ MEMORY_LOOP_DELETE_STRIKES = 3
 
 
 class Simulation:
-    def __init__(self, config: WorldConfig, rng_seed: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        config: WorldConfig,
+        rng_seed: Optional[int] = None,
+        authored_map: Optional[MapDocument] = None,
+    ) -> None:
         self.config = config
         self.rng = random.Random(rng_seed)
         self.world = World(config.width, config.height, config.sense_radius)
@@ -22,13 +28,50 @@ class Simulation:
         self.stats = SimulationStats()
         self.history: list[TickSnapshot] = []
         self._next_creature_id = 0
+        self.authored_map = authored_map.copy() if authored_map is not None else None
         self._initialize()
 
     def _initialize(self) -> None:
-        self._place_walls()
-        self._place_food()
-        self._place_creatures()
+        if self.authored_map is not None:
+            self._apply_authored_map()
+            self._place_creatures_from_authored_map()
+        else:
+            self._place_walls()
+            self._place_food()
+            self._place_creatures()
         self._update_stats()
+
+    def _apply_authored_map(self) -> None:
+        if self.authored_map is None:
+            return
+        for row in range(self.config.height):
+            for col in range(self.config.width):
+                self.world.set_tile(row, col, self.authored_map.terrain[row][col])
+
+    def _place_creatures_from_authored_map(self) -> None:
+        if self.authored_map is None or not self.authored_map.spawn_positions:
+            self._place_creatures()
+            return
+
+        preferred_positions = list(self.authored_map.spawn_positions)
+        for spawn in preferred_positions[: self.config.creature_count]:
+            creature = Creature(
+                id=self._next_creature_id,
+                position=Position(spawn.row, spawn.col),
+            )
+            self._next_creature_id += 1
+            self.world.set_tile(spawn.row, spawn.col, Tile.CREATURE)
+            self.creatures.append(creature)
+
+        remaining = self.config.creature_count - len(self.creatures)
+        if remaining > 0:
+            empties = self._empty_positions()
+            self.rng.shuffle(empties)
+            for r, c in empties[:remaining]:
+                creature = Creature(id=self._next_creature_id, position=Position(r, c))
+                self._next_creature_id += 1
+                self.world.set_tile(r, c, Tile.CREATURE)
+                self.creatures.append(creature)
 
     def _place_walls(self) -> None:
         # Border walls
@@ -525,15 +568,38 @@ class Simulation:
             creature.memory_cooldowns = {}
             creature.memory_loop_strikes = {}
 
-        self._place_food()
+        if self.authored_map is not None:
+            self._restore_authored_food()
+        else:
+            self._place_food()
         self._place_creatures_existing()
         self._update_stats()
 
     def _place_creatures_existing(self) -> None:
         empties = self._empty_positions()
-        self.rng.shuffle(empties)
+        if self.authored_map is not None and self.authored_map.spawn_positions:
+            preferred = [
+                (pos.row, pos.col)
+                for pos in self.authored_map.spawn_positions
+                if self.world.get_tile(pos.row, pos.col) == Tile.EMPTY
+            ]
+            preferred_set = set(preferred)
+            remainder = [pos for pos in empties if pos not in preferred_set]
+            self.rng.shuffle(remainder)
+            ordered_positions = preferred + remainder
+        else:
+            self.rng.shuffle(empties)
+            ordered_positions = empties
         for i, creature in enumerate(self.creatures):
-            if i < len(empties):
-                r, c = empties[i]
+            if i < len(ordered_positions):
+                r, c = ordered_positions[i]
                 creature.position = Position(r, c)
                 self.world.set_tile(r, c, Tile.CREATURE)
+
+    def _restore_authored_food(self) -> None:
+        if self.authored_map is None:
+            return
+        for row in range(self.authored_map.height):
+            for col in range(self.authored_map.width):
+                if self.authored_map.terrain[row][col] == MAP_FOOD:
+                    self.world.set_tile(row, col, Tile.FOOD)

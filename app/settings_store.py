@@ -38,8 +38,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "show_creature_ids": True,
     "highlight_selected": True,
     "sense_radius": 1,
+    "loaded_map_path": None,
+    "recent_map_paths": [],
     "main_window_geometry": None,
     "details_window_geometry": None,
+    "editor_window_geometry": None,
+    "editor_recent_map_path": None,
 }
 
 
