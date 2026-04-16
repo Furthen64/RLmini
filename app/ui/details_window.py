@@ -208,7 +208,7 @@ class DetailsWindow(QWidget):
         lines.append("")
 
         # Recent steps
-        lines.append("[Recent Steps (last 4)]")
+        lines.append("[Recent Steps (last 6)]")
         if c.recent_steps:
             for i, step in enumerate(c.recent_steps):
                 pos, sv_i, act = step[0], step[1], step[2]

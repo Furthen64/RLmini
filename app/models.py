@@ -42,6 +42,10 @@ class Creature:
     last_replayed_memory_idx: Optional[int] = None
     current_sense_vector: list[int] = field(default_factory=list)
     current_action: Optional[int] = None
+    recovery_steps_remaining: int = 0
+    recovery_loop_positions: list[Position] = field(default_factory=list)
+    memory_cooldowns: dict[int, int] = field(default_factory=dict)
+    memory_loop_strikes: dict[int, int] = field(default_factory=dict)
 
 
 @dataclass

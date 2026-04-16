@@ -27,13 +27,17 @@ def find_best_memory_match(
     creature: Creature,
     current_sense: list[int],
     threshold: float,
+    excluded_memory_indices: Optional[set[int]] = None,
 ) -> Optional[tuple[int, int, float]]:
     """Return (memory_idx, step_idx, score) or None."""
     best_score = -1.0
     best_len = float("inf")
     best_candidates: list[tuple[int, int, float]] = []
+    excluded = excluded_memory_indices or set()
 
     for mem_idx, mem_seq in enumerate(creature.memories):
+        if mem_idx in excluded:
+            continue
         for step_idx, step in enumerate(mem_seq.steps):
             score = sense_match_score(current_sense, step.sense_vector)
             if score < threshold:
