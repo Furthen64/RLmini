@@ -16,6 +16,10 @@ def sense_match_score(a: list[int], b: list[int]) -> float:
     return sum(x == y for x, y in zip(a, b)) / 8.0
 
 
+def _is_empty_sense(step: MemoryStep) -> bool:
+    return not any(step.sense_vector)
+
+
 def find_best_memory_match(
     creature: Creature,
     current_sense: list[int],
@@ -67,6 +71,15 @@ def is_junk_memory(steps: list[MemoryStep], positions: list[Position]) -> bool:
         if key in pos_set:
             return True
         pos_set.add(key)
+
+    # All steps have all-empty sense vectors (zero informational value)
+    if all(_is_empty_sense(s) for s in steps):
+        return True
+
+    # Majority of steps have all-empty sense vectors
+    empty_count = sum(1 for s in steps if _is_empty_sense(s))
+    if empty_count > len(steps) // 2:
+        return True
 
     return False
 
