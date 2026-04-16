@@ -98,7 +98,7 @@ def sequences_identical(a: MemorySequence, b: MemorySequence) -> bool:
 
 def try_create_memory(
     creature: Creature,
-    recent_steps: list,  # list of (Position, list[int], int)
+    recent_steps: list,  # list of (Position, list[int], int, Optional[int])
 ) -> Optional[MemorySequence]:
     candidate_steps_raw = recent_steps[-4:]
     if not candidate_steps_raw:
@@ -108,7 +108,8 @@ def try_create_memory(
     # An all-empty sense vector carries no positional information and is what
     # causes creatures to learn degenerate "go LEFT in open space" habits.
     last_empty_idx = -1
-    for i, (_, sv, _) in enumerate(candidate_steps_raw):
+    for i, step in enumerate(candidate_steps_raw):
+        sv = step[1]
         if not any(sv):
             last_empty_idx = i
     if last_empty_idx >= 0:
@@ -117,8 +118,8 @@ def try_create_memory(
     if not candidate_steps_raw:
         return None
 
-    positions = [p for p, sv, a in candidate_steps_raw]
-    steps = [MemoryStep(sense_vector=list(sv), action=a) for p, sv, a in candidate_steps_raw]
+    positions = [step[0] for step in candidate_steps_raw]
+    steps = [MemoryStep(sense_vector=list(step[1]), action=step[2]) for step in candidate_steps_raw]
 
     if is_junk_memory(steps, positions):
         return None

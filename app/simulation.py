@@ -98,7 +98,7 @@ class Simulation:
             self.stats.food_consumed += 1
             creature.mode = CreatureMode.FOOD_DIRECT
             action = self._direction_to(pos, new_pos)
-            creature.recent_steps.append((pos, list(sense), action))
+            creature.recent_steps.append((pos, list(sense), action, None))
             if len(creature.recent_steps) > 4:
                 creature.recent_steps.pop(0)
             creature.current_action = action
@@ -216,7 +216,7 @@ class Simulation:
         creature.current_action = action
         creature.last_action = action
 
-        creature.recent_steps.append((pos, list(sense), action))
+        creature.recent_steps.append((pos, list(sense), action, creature.active_memory_idx))
         if len(creature.recent_steps) > 4:
             creature.recent_steps.pop(0)
 

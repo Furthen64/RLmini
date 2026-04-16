@@ -1,7 +1,10 @@
+import datetime
+import os
+
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QGroupBox, QTextEdit,
+    QWidget, QVBoxLayout, QLabel, QGroupBox, QTextEdit, QPushButton, QApplication,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 
 from app.enums import Action, CreatureMode
 from app.models import Creature
@@ -93,6 +96,11 @@ class DetailsWindow(QWidget):
         mem_layout.addWidget(self.memories_text)
         layout.addWidget(mem_group)
 
+        # Copy to clipboard button
+        self.copy_btn = QPushButton("Copy Creature to Clipboard")
+        self.copy_btn.clicked.connect(self._copy_to_clipboard)
+        layout.addWidget(self.copy_btn)
+
         layout.addStretch()
 
     def update_creature(self, creature: Creature | None) -> None:
@@ -131,11 +139,15 @@ class DetailsWindow(QWidget):
 
         # Recent steps
         lines = []
-        for i, (pos, sv_i, act) in enumerate(creature.recent_steps):
+        for i, step in enumerate(creature.recent_steps):
+            pos, sv_i, act = step[0], step[1], step[2]
+            mem_idx = step[3] if len(step) > 3 else None
+            mem_tag = f" mem={mem_idx}" if mem_idx is not None else ""
             lines.append(
                 f"  {i}: pos=({pos.row},{pos.col}) "
                 f"sv={_sv_str(sv_i)} "
                 f"act={ACTION_NAMES.get(act, '?')}"
+                f"{mem_tag}"
             )
         self.steps_text.setPlainText("\n".join(lines) if lines else "(none)")
 
@@ -168,3 +180,103 @@ class DetailsWindow(QWidget):
     def refresh(self) -> None:
         if self.creature is not None:
             self.update_creature(self.creature)
+
+    def _build_creature_report(self) -> str:
+        c = self.creature
+        if c is None:
+            return "(no creature selected)"
+
+        lines: list[str] = []
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        lines.append(f"=== Creature #{c.id} Report  [{ts}] ===")
+        lines.append("")
+
+        # State
+        lines.append("[State]")
+        lines.append(f"  Position      : ({c.position.row}, {c.position.col})")
+        lines.append(f"  Mode          : {MODE_NAMES.get(c.mode, str(c.mode))}")
+        lines.append(f"  Current action: {ACTION_NAMES.get(c.current_action, '-')}")
+        lines.append(f"  Last action   : {ACTION_NAMES.get(c.last_action, '-')}")
+        lines.append(f"  Food score    : {c.food_score}")
+        lines.append(f"  Match score   : {c.last_match_score:.3f}")
+        lines.append(f"  Replay fail   : {c.last_replay_fail_reason or '-'}")
+        lines.append("")
+
+        # Sense vector
+        lines.append("[Current Sense Vector]")
+        lines.append(f"  {_sv_str(c.current_sense_vector)}")
+        lines.append("")
+
+        # Recent steps
+        lines.append("[Recent Steps (last 4)]")
+        if c.recent_steps:
+            for i, step in enumerate(c.recent_steps):
+                pos, sv_i, act = step[0], step[1], step[2]
+                mem_idx = step[3] if len(step) > 3 else None
+                mem_tag = f"  mem={mem_idx}" if mem_idx is not None else ""
+                lines.append(
+                    f"  [{i}] pos=({pos.row},{pos.col})"
+                    f"  sv={_sv_str(sv_i)}"
+                    f"  act={ACTION_NAMES.get(act, '?')}"
+                    f"{mem_tag}"
+                )
+        else:
+            lines.append("  (none)")
+        lines.append("")
+
+        # Active memory
+        lines.append("[Active Memory]")
+        if c.active_memory_idx is not None and c.active_step_idx is not None:
+            mem = c.memories[c.active_memory_idx]
+            step = mem.steps[c.active_step_idx]
+            lines.append(
+                f"  Memory {c.active_memory_idx}, step {c.active_step_idx}"
+                f"  sv={_sv_str(step.sense_vector)}"
+                f"  act={ACTION_NAMES.get(step.action, '?')}"
+            )
+        else:
+            lines.append("  -")
+        lines.append("")
+
+        # All stored memories
+        lines.append(f"[Stored Memories ({len(c.memories)} total)]")
+        if c.memories:
+            for m_idx, mem_seq in enumerate(c.memories):
+                lines.append(f"  Memory {m_idx} ({len(mem_seq.steps)} steps):")
+                for s_idx, s in enumerate(mem_seq.steps):
+                    lines.append(
+                        f"    [{s_idx}] sv={_sv_str(s.sense_vector)}"
+                        f"  act={ACTION_NAMES.get(s.action, '?')}"
+                    )
+        else:
+            lines.append("  (no memories)")
+
+        return "\n".join(lines)
+
+    def _copy_to_clipboard(self) -> None:
+        report = self._build_creature_report()
+
+        # Copy to system clipboard
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(report)
+
+        # Save to a text file in the user's home directory
+        if self.creature is not None:
+            filename = f"creature_{self.creature.id}_report.txt"
+            save_path = os.path.join(os.path.expanduser("~"), filename)
+            try:
+                with open(save_path, "w", encoding="utf-8") as fh:
+                    fh.write(report)
+                self._set_btn_feedback(f"Copied! Saved → ~/{filename}")
+            except PermissionError:
+                self._set_btn_feedback("Copied! (Save failed: permission denied)")
+            except OSError as exc:
+                self._set_btn_feedback(f"Copied! (Save failed: {exc.strerror})")
+        else:
+            self._set_btn_feedback("No creature selected")
+
+    def _set_btn_feedback(self, text: str) -> None:
+        """Show feedback text on the copy button, then restore the original label."""
+        self.copy_btn.setText(text)
+        QTimer.singleShot(3000, lambda: self.copy_btn.setText("Copy Creature to Clipboard"))
