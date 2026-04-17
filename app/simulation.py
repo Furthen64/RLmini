@@ -201,7 +201,7 @@ class Simulation:
             creature.last_replayed_memory_idx = None
             creature.recovery_steps_remaining = 0
             creature.recovery_loop_positions = []
-            self._record_reverse_pheromone(creature)
+            self._maybe_record_pheromone(creature)
             return
 
         # 2. Visible food pursuit (diagonal counts)
