@@ -524,7 +524,7 @@ class Simulation:
             self._execute_move(creature, Action.IDLE, sense, CreatureMode.EXPLORE)
             return
 
-        legal = self._prefer_non_reversal_moves(legal, creature.last_action)
+        legal = self._prefer_non_reversal_moves(legal, creature.current_action)
 
         recent_positions = {
             (step_pos.row, step_pos.col)
@@ -594,7 +594,7 @@ class Simulation:
             return
 
         # Avoid immediate reversal if another option exists
-        legal = self._prefer_non_reversal_moves(legal, creature.last_action)
+        legal = self._prefer_non_reversal_moves(legal, creature.current_action)
 
         if not creature.last_replay_fail_reason:
             creature.last_replay_fail_reason = "no match"
