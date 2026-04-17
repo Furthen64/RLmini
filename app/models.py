@@ -46,6 +46,7 @@ class Creature:
     recovery_loop_positions: list[Position] = field(default_factory=list)
     memory_cooldowns: dict[int, int] = field(default_factory=dict)
     memory_loop_strikes: dict[int, int] = field(default_factory=dict)
+    reverse_pheromone: dict[tuple[int, int], float] = field(default_factory=dict)
 
 
 @dataclass

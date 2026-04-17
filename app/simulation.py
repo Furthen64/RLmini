@@ -12,6 +12,15 @@ MAX_LOOP_PATTERN_LEN = 3
 RECOVERY_EXPLORE_STEPS = 4
 MEMORY_LOOP_COOLDOWN_TICKS = 8
 MEMORY_LOOP_DELETE_STRIKES = 3
+REVERSE_PHEROMONE_DECAY = 0.82
+REVERSE_PHEROMONE_DEPOSIT = 1.0
+REVERSE_PHEROMONE_NEIGHBOR_WEIGHT = 0.35
+REVERSE_PHEROMONE_DISTANCE2_WEIGHT = 0.12
+REVERSE_PHEROMONE_PRUNE_THRESHOLD = 0.05
+REVERSE_PHEROMONE_OSCILLATION_PENALTY = 1.75
+REVERSE_PHEROMONE_REPEATED_HIT_PENALTY = 0.5
+REVERSE_PHEROMONE_STAGNATION_RATIO = 0.6
+REVERSE_PHEROMONE_STAGNATION_MULTIPLIER = 1.5
 
 
 class Simulation:
@@ -39,6 +48,7 @@ class Simulation:
             self._place_walls()
             self._place_food()
             self._place_creatures()
+        self._seed_reverse_pheromones()
         self._update_stats()
 
     def _apply_authored_map(self) -> None:
@@ -146,6 +156,7 @@ class Simulation:
 
     def _tick_creature(self, creature: Creature) -> None:
         self._tick_down_memory_cooldowns(creature)
+        self._decay_reverse_pheromone(creature)
         pos = creature.position
         sense = self.world.get_sense_vector(pos)
         creature.current_sense_vector = list(sense)
@@ -177,6 +188,7 @@ class Simulation:
             creature.last_replayed_memory_idx = None
             creature.recovery_steps_remaining = 0
             creature.recovery_loop_positions = []
+            self._record_reverse_pheromone(creature)
             return
 
         # 2. Visible food pursuit (diagonal counts)
@@ -187,7 +199,11 @@ class Simulation:
             legal = self.world.get_legal_moves(pos)
             toward_legal = [m for m in best_moves if m in legal]
             if toward_legal:
-                action = self.rng.choice(toward_legal)
+                action = self._choose_action_with_lowest_revisit_penalty(
+                    creature,
+                    pos,
+                    toward_legal,
+                )
                 creature.mode = CreatureMode.FOOD_DIRECT
                 creature.active_memory_idx = None
                 creature.active_step_idx = None
@@ -284,6 +300,106 @@ class Simulation:
             if ticks > 1:
                 updated[mem_idx] = ticks - 1
         creature.memory_cooldowns = updated
+
+    def _seed_reverse_pheromones(self) -> None:
+        for creature in self.creatures:
+            self._record_reverse_pheromone(creature)
+
+    def _decay_reverse_pheromone(self, creature: Creature) -> None:
+        updated: dict[tuple[int, int], float] = {}
+        for key, strength in creature.reverse_pheromone.items():
+            next_strength = strength * REVERSE_PHEROMONE_DECAY
+            if next_strength >= REVERSE_PHEROMONE_PRUNE_THRESHOLD:
+                updated[key] = next_strength
+        creature.reverse_pheromone = updated
+
+    def _record_reverse_pheromone(self, creature: Creature) -> None:
+        key = (creature.position.row, creature.position.col)
+        creature.reverse_pheromone[key] = (
+            creature.reverse_pheromone.get(key, 0.0) + REVERSE_PHEROMONE_DEPOSIT
+        )
+
+    def _choose_action_with_lowest_revisit_penalty(
+        self,
+        creature: Creature,
+        pos: Position,
+        legal: list[int],
+    ) -> int:
+        if not legal:
+            return Action.IDLE
+
+        recent_positions = [step_pos for step_pos, _, _, _ in creature.recent_steps[-MAX_RECENT_STEPS:]]
+        trace_positions = recent_positions + [pos]
+        best_penalty: Optional[float] = None
+        best_actions: list[int] = []
+        for action in legal:
+            penalty = self._calculate_revisit_penalty_for_action(
+                creature,
+                pos,
+                action,
+                recent_positions,
+                trace_positions,
+            )
+            if best_penalty is None or penalty < best_penalty:
+                best_penalty = penalty
+                best_actions = [action]
+            elif penalty == best_penalty:
+                best_actions.append(action)
+        return self.rng.choice(best_actions)
+
+    def _calculate_revisit_penalty_for_action(
+        self,
+        creature: Creature,
+        pos: Position,
+        action: int,
+        recent_positions: list[Position],
+        trace_positions: list[Position],
+    ) -> float:
+        candidate = self.world.move_pos(pos, action)
+        base_penalty = self._reverse_pheromone_strength(creature, candidate)
+        loop_penalty = 0.0
+
+        candidate_key = (candidate.row, candidate.col)
+
+        if recent_positions:
+            previous_key = (recent_positions[-1].row, recent_positions[-1].col)
+            if candidate_key == previous_key:
+                loop_penalty += REVERSE_PHEROMONE_OSCILLATION_PENALTY
+
+        repeated_hits = sum(
+            1
+            for recent_pos in recent_positions
+            if recent_pos.row == candidate.row and recent_pos.col == candidate.col
+        )
+        if repeated_hits > 0:
+            loop_penalty += repeated_hits * REVERSE_PHEROMONE_REPEATED_HIT_PENALTY
+
+        penalty = base_penalty + loop_penalty
+        if self._recent_progress_ratio(trace_positions) < REVERSE_PHEROMONE_STAGNATION_RATIO:
+            penalty *= REVERSE_PHEROMONE_STAGNATION_MULTIPLIER
+
+        return penalty
+
+    def _reverse_pheromone_strength(self, creature: Creature, pos: Position) -> float:
+        total = 0.0
+        for (row, col), strength in creature.reverse_pheromone.items():
+            manhattan_distance = abs(pos.row - row) + abs(pos.col - col)
+            if manhattan_distance == 0:
+                total += strength
+            elif manhattan_distance == 1:
+                total += strength * REVERSE_PHEROMONE_NEIGHBOR_WEIGHT
+            elif manhattan_distance == 2:
+                total += strength * REVERSE_PHEROMONE_DISTANCE2_WEIGHT
+        return total
+
+    def _recent_progress_ratio(self, positions: list[Position]) -> float:
+        if not positions:
+            return 1.0
+        unique_positions = {
+            (position.row, position.col)
+            for position in positions
+        }
+        return len(unique_positions) / len(positions)
 
     def _detect_recent_loop(self, creature: Creature) -> Optional[list[tuple[Position, list[int], int, Optional[int]]]]:
         recent = creature.recent_steps[-MAX_RECENT_STEPS:]
@@ -438,7 +554,12 @@ class Simulation:
             elif score == best_score:
                 best_actions.append(action)
 
-        action = self.rng.choice(best_actions if best_actions else legal)
+        candidate_actions = best_actions if best_actions else legal
+        action = self._choose_action_with_lowest_revisit_penalty(
+            creature,
+            pos,
+            candidate_actions,
+        )
         self._execute_move(creature, action, sense, CreatureMode.EXPLORE)
 
         if creature.recovery_steps_remaining == 0:
@@ -477,7 +598,7 @@ class Simulation:
 
         if not creature.last_replay_fail_reason:
             creature.last_replay_fail_reason = "no match"
-        action = self.rng.choice(legal)
+        action = self._choose_action_with_lowest_revisit_penalty(creature, pos, legal)
         self._execute_move(creature, action, sense, CreatureMode.EXPLORE)
 
     def _execute_move(
@@ -506,6 +627,7 @@ class Simulation:
         creature.recent_steps.append((pos, list(sense), action, creature.active_memory_idx))
         if len(creature.recent_steps) > MAX_RECENT_STEPS:
             creature.recent_steps.pop(0)
+        self._record_reverse_pheromone(creature)
 
     def _direction_to(self, src: Position, dst: Position) -> int:
         dr = dst.row - src.row
@@ -567,12 +689,14 @@ class Simulation:
             creature.recovery_loop_positions = []
             creature.memory_cooldowns = {}
             creature.memory_loop_strikes = {}
+            creature.reverse_pheromone = {}
 
         if self.authored_map is not None:
             self._restore_authored_food()
         else:
             self._place_food()
         self._place_creatures_existing()
+        self._seed_reverse_pheromones()
         self._update_stats()
 
     def _place_creatures_existing(self) -> None:
