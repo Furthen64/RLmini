@@ -363,10 +363,9 @@ class Simulation:
         creature.visible_pheromone = updated
 
     def _maybe_record_pheromone(self, creature: Creature) -> None:
-        if self.rng.random() >= self.config.pheromone_drop_chance:
-            return
-        self._record_reverse_pheromone(creature)
-        self._record_visible_pheromone(creature)
+        if self.rng.random() < self.config.pheromone_drop_chance:
+            self._record_reverse_pheromone(creature)
+            self._record_visible_pheromone(creature)
 
     def _choose_action_with_lowest_revisit_penalty(
         self,

@@ -14,6 +14,7 @@ SELECTED_COLOR = QColor(255, 220, 0)
 GRID_LINE_COLOR = QColor(60, 60, 70)
 PHEROMONE_COLOR = QColor(180, 80, 255)
 PHEROMONE_MAX_ALPHA = 170
+PHEROMONE_STRENGTH_NORMALIZER = 2.0
 
 
 class GridWidget(QWidget):
@@ -112,7 +113,10 @@ class GridWidget(QWidget):
         )
 
     def _pheromone_alpha(self, strength: float) -> int:
-        return int(PHEROMONE_MAX_ALPHA * min(1.0, strength / 2.0))
+        return int(
+            PHEROMONE_MAX_ALPHA
+            * min(1.0, strength / PHEROMONE_STRENGTH_NORMALIZER)
+        )
 
     def paintEvent(self, event: QPaintEvent) -> None:
         if self.world is None:
