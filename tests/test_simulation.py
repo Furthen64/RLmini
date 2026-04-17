@@ -14,6 +14,7 @@ class SimulationExploreTests(unittest.TestCase):
             food_count=0,
             wall_count=0,
             seed=1,
+            pheromone_drop_chance=0.0,
         )
         self.simulation = Simulation(config)
 
@@ -54,6 +55,53 @@ class SimulationExploreTests(unittest.TestCase):
         self.assertEqual(self.creature.current_action, Action.DOWN)
         self.assertEqual(self.creature.last_action, Action.RIGHT)
         self.assertEqual(self.creature.recovery_steps_remaining, 1)
+
+    def test_following_creature_prefers_other_visible_pheromone(self) -> None:
+        follower = Creature(
+            id=2,
+            position=Position(2, 2),
+            follow_pheromone_trail=True,
+        )
+        self.simulation.pheromone_trail[(2, 1)] = 2.0
+
+        toward_pheromone = self.simulation._calculate_revisit_penalty_for_action(
+            follower,
+            follower.position,
+            Action.LEFT,
+            [],
+            [follower.position],
+        )
+        away_from_pheromone = self.simulation._calculate_revisit_penalty_for_action(
+            follower,
+            follower.position,
+            Action.DOWN,
+            [],
+            [follower.position],
+        )
+
+        self.assertLess(toward_pheromone, away_from_pheromone)
+
+    def test_execute_move_can_leave_visible_pheromone(self) -> None:
+        config = WorldConfig(
+            width=5,
+            height=5,
+            creature_count=0,
+            food_count=0,
+            wall_count=0,
+            seed=1,
+            pheromone_drop_chance=1.0,
+        )
+        simulation = Simulation(config)
+        creature = Creature(id=3, position=Position(2, 2))
+        simulation.creatures = [creature]
+        simulation.world.set_tile(2, 2, Tile.CREATURE)
+
+        sense = simulation.world.get_sense_vector(creature.position)
+        simulation._execute_move(creature, Action.DOWN, sense, creature.mode)
+
+        self.assertGreater(simulation.pheromone_trail.get((3, 2), 0.0), 0.0)
+        self.assertGreater(creature.reverse_pheromone.get((3, 2), 0.0), 0.0)
+        self.assertIn((3, 2), simulation.take_dirty_cells())
 
 
 if __name__ == "__main__":

@@ -37,6 +37,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "show_grid_lines": True,
     "show_creature_ids": True,
     "highlight_selected": True,
+    "show_pheromone_trail": True,
     "sense_radius": 1,
     "loaded_map_path": None,
     "recent_map_paths": [],

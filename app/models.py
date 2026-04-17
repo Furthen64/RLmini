@@ -30,6 +30,7 @@ class Creature:
     id: int
     position: Position
     memories: list[MemorySequence] = field(default_factory=list)
+    follow_pheromone_trail: bool = False
     food_score: int = 0
     # runtime state
     mode: int = 2  # CreatureMode.EXPLORE
@@ -66,6 +67,8 @@ class WorldConfig:
     show_creature_ids: bool = True
     highlight_selected: bool = True
     sense_radius: int = 1
+    pheromone_drop_chance: float = 0.35
+    pheromone_follow_chance: float = 0.5
 
 
 @dataclass

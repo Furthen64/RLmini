@@ -21,6 +21,10 @@ REVERSE_PHEROMONE_OSCILLATION_PENALTY = 1.75
 REVERSE_PHEROMONE_REPEATED_HIT_PENALTY = 0.5
 REVERSE_PHEROMONE_STAGNATION_RATIO = 0.6
 REVERSE_PHEROMONE_STAGNATION_MULTIPLIER = 1.5
+VISIBLE_PHEROMONE_DECAY = 0.9
+VISIBLE_PHEROMONE_DEPOSIT = 1.0
+VISIBLE_PHEROMONE_PRUNE_THRESHOLD = 0.05
+OTHER_PHEROMONE_ATTRACTION_WEIGHT = 0.8
 
 
 class Simulation:
@@ -36,6 +40,8 @@ class Simulation:
         self.creatures: list[Creature] = []
         self.stats = SimulationStats()
         self.history: list[TickSnapshot] = []
+        self.pheromone_trail: dict[tuple[int, int], float] = {}
+        self._dirty_pheromone_cells: set[tuple[int, int]] = set()
         self._next_creature_id = 0
         self.authored_map = authored_map.copy() if authored_map is not None else None
         self._initialize()
@@ -48,7 +54,7 @@ class Simulation:
             self._place_walls()
             self._place_food()
             self._place_creatures()
-        self._seed_reverse_pheromones()
+        self._seed_pheromones()
         self._update_stats()
 
     def _apply_authored_map(self) -> None:
@@ -65,10 +71,7 @@ class Simulation:
 
         preferred_positions = list(self.authored_map.spawn_positions)
         for spawn in preferred_positions[: self.config.creature_count]:
-            creature = Creature(
-                id=self._next_creature_id,
-                position=Position(spawn.row, spawn.col),
-            )
+            creature = self._create_creature(spawn.row, spawn.col)
             self._next_creature_id += 1
             self.world.set_tile(spawn.row, spawn.col, Tile.CREATURE)
             self.creatures.append(creature)
@@ -78,7 +81,7 @@ class Simulation:
             empties = self._empty_positions()
             self.rng.shuffle(empties)
             for r, c in empties[:remaining]:
-                creature = Creature(id=self._next_creature_id, position=Position(r, c))
+                creature = self._create_creature(r, c)
                 self._next_creature_id += 1
                 self.world.set_tile(r, c, Tile.CREATURE)
                 self.creatures.append(creature)
@@ -124,10 +127,19 @@ class Simulation:
         empties = self._empty_positions()
         self.rng.shuffle(empties)
         for r, c in empties[: self.config.creature_count]:
-            creature = Creature(id=self._next_creature_id, position=Position(r, c))
+            creature = self._create_creature(r, c)
             self._next_creature_id += 1
             self.world.set_tile(r, c, Tile.CREATURE)
             self.creatures.append(creature)
+
+    def _create_creature(self, row: int, col: int) -> Creature:
+        return Creature(
+            id=self._next_creature_id,
+            position=Position(row, col),
+            follow_pheromone_trail=(
+                self.rng.random() < self.config.pheromone_follow_chance
+            ),
+        )
 
     def _update_stats(self) -> None:
         self.stats.food_remaining = self.world.count_food()
@@ -141,6 +153,7 @@ class Simulation:
             self.stats.avg_creature_score = 0.0
 
     def tick(self) -> None:
+        self._decay_visible_pheromones()
         order = list(self.creatures)
         self.rng.shuffle(order)
         for creature in order:
@@ -301,9 +314,9 @@ class Simulation:
                 updated[mem_idx] = ticks - 1
         creature.memory_cooldowns = updated
 
-    def _seed_reverse_pheromones(self) -> None:
+    def _seed_pheromones(self) -> None:
         for creature in self.creatures:
-            self._record_reverse_pheromone(creature)
+            self._maybe_record_pheromone(creature)
 
     def _decay_reverse_pheromone(self, creature: Creature) -> None:
         updated: dict[tuple[int, int], float] = {}
@@ -318,6 +331,30 @@ class Simulation:
         creature.reverse_pheromone[key] = (
             creature.reverse_pheromone.get(key, 0.0) + REVERSE_PHEROMONE_DEPOSIT
         )
+
+    def _decay_visible_pheromones(self) -> None:
+        if not self.pheromone_trail:
+            return
+        updated: dict[tuple[int, int], float] = {}
+        for key, strength in self.pheromone_trail.items():
+            next_strength = strength * VISIBLE_PHEROMONE_DECAY
+            self._dirty_pheromone_cells.add(key)
+            if next_strength >= VISIBLE_PHEROMONE_PRUNE_THRESHOLD:
+                updated[key] = next_strength
+        self.pheromone_trail = updated
+
+    def _record_visible_pheromone(self, creature: Creature) -> None:
+        key = (creature.position.row, creature.position.col)
+        self.pheromone_trail[key] = (
+            self.pheromone_trail.get(key, 0.0) + VISIBLE_PHEROMONE_DEPOSIT
+        )
+        self._dirty_pheromone_cells.add(key)
+
+    def _maybe_record_pheromone(self, creature: Creature) -> None:
+        if self.rng.random() >= self.config.pheromone_drop_chance:
+            return
+        self._record_reverse_pheromone(creature)
+        self._record_visible_pheromone(creature)
 
     def _choose_action_with_lowest_revisit_penalty(
         self,
@@ -375,6 +412,11 @@ class Simulation:
             loop_penalty += repeated_hits * REVERSE_PHEROMONE_REPEATED_HIT_PENALTY
 
         penalty = base_penalty + loop_penalty
+        if creature.follow_pheromone_trail:
+            penalty -= (
+                self._other_pheromone_strength(creature, candidate)
+                * OTHER_PHEROMONE_ATTRACTION_WEIGHT
+            )
         if self._recent_progress_ratio(trace_positions) < REVERSE_PHEROMONE_STAGNATION_RATIO:
             penalty *= REVERSE_PHEROMONE_STAGNATION_MULTIPLIER
 
@@ -391,6 +433,12 @@ class Simulation:
             elif manhattan_distance == 2:
                 total += strength * REVERSE_PHEROMONE_DISTANCE2_WEIGHT
         return total
+
+    def _other_pheromone_strength(self, creature: Creature, pos: Position) -> float:
+        key = (pos.row, pos.col)
+        visible = self.pheromone_trail.get(key, 0.0)
+        own = creature.reverse_pheromone.get(key, 0.0)
+        return max(0.0, visible - own)
 
     def _recent_progress_ratio(self, positions: list[Position]) -> float:
         if not positions:
@@ -627,7 +675,7 @@ class Simulation:
         creature.recent_steps.append((pos, list(sense), action, creature.active_memory_idx))
         if len(creature.recent_steps) > MAX_RECENT_STEPS:
             creature.recent_steps.pop(0)
-        self._record_reverse_pheromone(creature)
+        self._maybe_record_pheromone(creature)
 
     def _direction_to(self, src: Position, dst: Position) -> int:
         dr = dst.row - src.row
@@ -690,14 +738,21 @@ class Simulation:
             creature.memory_cooldowns = {}
             creature.memory_loop_strikes = {}
             creature.reverse_pheromone = {}
+        self.pheromone_trail = {}
+        self._dirty_pheromone_cells = set()
 
         if self.authored_map is not None:
             self._restore_authored_food()
         else:
             self._place_food()
         self._place_creatures_existing()
-        self._seed_reverse_pheromones()
+        self._seed_pheromones()
         self._update_stats()
+
+    def take_dirty_cells(self) -> list[tuple[int, int]]:
+        dirty = set(self.world.take_changed_cells()) | self._dirty_pheromone_cells
+        self._dirty_pheromone_cells = set()
+        return list(dirty)
 
     def _place_creatures_existing(self) -> None:
         empties = self._empty_positions()

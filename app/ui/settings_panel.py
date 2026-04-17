@@ -101,6 +101,10 @@ class SettingsPanel(QWidget):
         self.cb_highlight.setChecked(True)
         form.addRow("Highlight Selected:", self.cb_highlight)
 
+        self.cb_pheromone_trail = QCheckBox()
+        self.cb_pheromone_trail.setChecked(True)
+        form.addRow("View pheromone trail:", self.cb_pheromone_trail)
+
         main_layout.addWidget(group)
 
         btn_layout = QHBoxLayout()
@@ -132,6 +136,7 @@ class SettingsPanel(QWidget):
             "show_grid_lines": self.cb_grid_lines.isChecked(),
             "show_creature_ids": self.cb_creature_ids.isChecked(),
             "highlight_selected": self.cb_highlight.isChecked(),
+            "show_pheromone_trail": self.cb_pheromone_trail.isChecked(),
         }
 
     def apply_settings(self, settings: dict) -> None:
@@ -152,3 +157,4 @@ class SettingsPanel(QWidget):
         self.cb_grid_lines.setChecked(bool(settings.get("show_grid_lines", True)))
         self.cb_creature_ids.setChecked(bool(settings.get("show_creature_ids", True)))
         self.cb_highlight.setChecked(bool(settings.get("highlight_selected", True)))
+        self.cb_pheromone_trail.setChecked(bool(settings.get("show_pheromone_trail", True)))
