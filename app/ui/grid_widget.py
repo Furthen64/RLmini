@@ -13,6 +13,7 @@ MEMORY_COLOR = QColor(160, 80, 230)
 SELECTED_COLOR = QColor(255, 220, 0)
 GRID_LINE_COLOR = QColor(60, 60, 70)
 PHEROMONE_COLOR = QColor(180, 80, 255)
+PHEROMONE_MAX_ALPHA = 170
 
 
 class GridWidget(QWidget):
@@ -86,6 +87,32 @@ class GridWidget(QWidget):
         self._update_size()
         self.update()
 
+    def _draw_pheromone_overlay(
+        self,
+        painter: QPainter,
+        x: int,
+        y: int,
+        cell_size: int,
+        strength: float,
+    ) -> None:
+        if not self.show_pheromone_trail or strength <= 0.0:
+            return
+        painter.fillRect(
+            x,
+            y,
+            cell_size,
+            cell_size,
+            QColor(
+                PHEROMONE_COLOR.red(),
+                PHEROMONE_COLOR.green(),
+                PHEROMONE_COLOR.blue(),
+                min(
+                    PHEROMONE_MAX_ALPHA,
+                    int(PHEROMONE_MAX_ALPHA * min(1.0, strength / 2.0)),
+                ),
+            ),
+        )
+
     def paintEvent(self, event: QPaintEvent) -> None:
         if self.world is None:
             return
@@ -111,19 +138,7 @@ class GridWidget(QWidget):
                     painter.fillRect(x, y, cs, cs, WALL_COLOR)
                 elif tile == Tile.FOOD:
                     painter.fillRect(x, y, cs, cs, EMPTY_COLOR)
-                    if self.show_pheromone_trail and pheromone_strength > 0.0:
-                        painter.fillRect(
-                            x,
-                            y,
-                            cs,
-                            cs,
-                            QColor(
-                                PHEROMONE_COLOR.red(),
-                                PHEROMONE_COLOR.green(),
-                                PHEROMONE_COLOR.blue(),
-                                min(170, int(170 * min(1.0, pheromone_strength / 2.0))),
-                            ),
-                        )
+                    self._draw_pheromone_overlay(painter, x, y, cs, pheromone_strength)
                     painter.setBrush(FOOD_COLOR)
                     painter.setPen(Qt.PenStyle.NoPen)
                     margin = max(2, cs // 4)
@@ -133,19 +148,7 @@ class GridWidget(QWidget):
                     )
                 else:
                     painter.fillRect(x, y, cs, cs, EMPTY_COLOR)
-                    if self.show_pheromone_trail and pheromone_strength > 0.0:
-                        painter.fillRect(
-                            x,
-                            y,
-                            cs,
-                            cs,
-                            QColor(
-                                PHEROMONE_COLOR.red(),
-                                PHEROMONE_COLOR.green(),
-                                PHEROMONE_COLOR.blue(),
-                                min(170, int(170 * min(1.0, pheromone_strength / 2.0))),
-                            ),
-                        )
+                    self._draw_pheromone_overlay(painter, x, y, cs, pheromone_strength)
 
         # Draw creatures (only those in clip region)
         font = QFont()
