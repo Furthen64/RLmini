@@ -346,16 +346,17 @@ class Simulation:
         action: int,
     ) -> float:
         candidate = self.world.move_pos(pos, action)
-        penalty = self._reverse_pheromone_strength(creature, candidate)
+        base_penalty = self._reverse_pheromone_strength(creature, candidate)
+        loop_penalty = 0.0
 
         recent_positions = [step_pos for step_pos, _, _, _ in creature.recent_steps[-MAX_RECENT_STEPS:]]
-        recent_positions.append(pos)
+        trace_positions = recent_positions + [pos]
         candidate_key = (candidate.row, candidate.col)
 
-        if len(recent_positions) >= 2:
-            previous_key = (recent_positions[-2].row, recent_positions[-2].col)
+        if recent_positions:
+            previous_key = (recent_positions[-1].row, recent_positions[-1].col)
             if candidate_key == previous_key:
-                penalty += REVERSE_PHEROMONE_OSCILLATION_PENALTY
+                loop_penalty += REVERSE_PHEROMONE_OSCILLATION_PENALTY
 
         repeated_hits = sum(
             1
@@ -363,10 +364,10 @@ class Simulation:
             if recent_pos.row == candidate.row and recent_pos.col == candidate.col
         )
         if repeated_hits > 0:
-            penalty += repeated_hits * REVERSE_PHEROMONE_REPEATED_HIT_PENALTY
+            loop_penalty += repeated_hits * REVERSE_PHEROMONE_REPEATED_HIT_PENALTY
 
-        unique_ratio = self._recent_progress_ratio(recent_positions)
-        if unique_ratio < REVERSE_PHEROMONE_STAGNATION_RATIO:
+        penalty = base_penalty + loop_penalty
+        if self._recent_progress_ratio(trace_positions) < REVERSE_PHEROMONE_STAGNATION_RATIO:
             penalty *= REVERSE_PHEROMONE_STAGNATION_MULTIPLIER
 
         return penalty
