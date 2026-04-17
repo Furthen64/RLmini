@@ -328,10 +328,18 @@ class Simulation:
         if not legal:
             return Action.IDLE
 
+        recent_positions = [step_pos for step_pos, _, _, _ in creature.recent_steps[-MAX_RECENT_STEPS:]]
+        trace_positions = recent_positions + [pos]
         best_penalty: Optional[float] = None
         best_actions: list[int] = []
         for action in legal:
-            penalty = self._calculate_revisit_penalty_for_action(creature, pos, action)
+            penalty = self._calculate_revisit_penalty_for_action(
+                creature,
+                pos,
+                action,
+                recent_positions,
+                trace_positions,
+            )
             if best_penalty is None or penalty < best_penalty:
                 best_penalty = penalty
                 best_actions = [action]
@@ -344,13 +352,13 @@ class Simulation:
         creature: Creature,
         pos: Position,
         action: int,
+        recent_positions: list[Position],
+        trace_positions: list[Position],
     ) -> float:
         candidate = self.world.move_pos(pos, action)
         base_penalty = self._reverse_pheromone_strength(creature, candidate)
         loop_penalty = 0.0
 
-        recent_positions = [step_pos for step_pos, _, _, _ in creature.recent_steps[-MAX_RECENT_STEPS:]]
-        trace_positions = recent_positions + [pos]
         candidate_key = (candidate.row, candidate.col)
 
         if recent_positions:
@@ -375,12 +383,12 @@ class Simulation:
     def _reverse_pheromone_strength(self, creature: Creature, pos: Position) -> float:
         total = 0.0
         for (row, col), strength in creature.reverse_pheromone.items():
-            distance = abs(pos.row - row) + abs(pos.col - col)
-            if distance == 0:
+            manhattan_distance = abs(pos.row - row) + abs(pos.col - col)
+            if manhattan_distance == 0:
                 total += strength
-            elif distance == 1:
+            elif manhattan_distance == 1:
                 total += strength * REVERSE_PHEROMONE_NEIGHBOR_WEIGHT
-            elif distance == 2:
+            elif manhattan_distance == 2:
                 total += strength * REVERSE_PHEROMONE_DISTANCE2_WEIGHT
         return total
 
