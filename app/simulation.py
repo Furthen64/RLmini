@@ -18,6 +18,7 @@ REVERSE_PHEROMONE_NEIGHBOR_WEIGHT = 0.35
 REVERSE_PHEROMONE_DISTANCE2_WEIGHT = 0.12
 REVERSE_PHEROMONE_PRUNE_THRESHOLD = 0.05
 REVERSE_PHEROMONE_OSCILLATION_PENALTY = 1.75
+REVERSE_PHEROMONE_REPEATED_HIT_PENALTY = 0.5
 REVERSE_PHEROMONE_STAGNATION_RATIO = 0.6
 REVERSE_PHEROMONE_STAGNATION_MULTIPLIER = 1.5
 
@@ -330,7 +331,7 @@ class Simulation:
         best_penalty: Optional[float] = None
         best_actions: list[int] = []
         for action in legal:
-            penalty = self._revisit_penalty_for_action(creature, pos, action)
+            penalty = self._calculate_revisit_penalty_for_action(creature, pos, action)
             if best_penalty is None or penalty < best_penalty:
                 best_penalty = penalty
                 best_actions = [action]
@@ -338,7 +339,12 @@ class Simulation:
                 best_actions.append(action)
         return self.rng.choice(best_actions)
 
-    def _revisit_penalty_for_action(self, creature: Creature, pos: Position, action: int) -> float:
+    def _calculate_revisit_penalty_for_action(
+        self,
+        creature: Creature,
+        pos: Position,
+        action: int,
+    ) -> float:
         candidate = self.world.move_pos(pos, action)
         penalty = self._reverse_pheromone_strength(creature, candidate)
 
@@ -357,7 +363,7 @@ class Simulation:
             if recent_pos.row == candidate.row and recent_pos.col == candidate.col
         )
         if repeated_hits > 0:
-            penalty += repeated_hits * 0.5
+            penalty += repeated_hits * REVERSE_PHEROMONE_REPEATED_HIT_PENALTY
 
         unique_ratio = self._recent_progress_ratio(recent_positions)
         if unique_ratio < REVERSE_PHEROMONE_STAGNATION_RATIO:
