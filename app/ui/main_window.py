@@ -241,7 +241,11 @@ class MainWindow(QMainWindow):
             seed = random.randint(0, 999_999)
         self.simulation = Simulation(config, rng_seed=seed, authored_map=self.loaded_map)
         self.grid_widget.apply_settings(self.settings)
-        self.grid_widget.set_world(self.simulation.world, self.simulation.creatures)
+        self.grid_widget.set_world(
+            self.simulation.world,
+            self.simulation.creatures,
+            self.simulation.pheromone_trail,
+        )
         self.selected_creature = None
         self.details_window.update_creature(None)
         self.stats_graph.clear()
@@ -432,8 +436,7 @@ class MainWindow(QMainWindow):
             self._auto_epoch_end()
         else:
             self._update_ui()
-            # Use dirty-rect refresh with changed cells from the world
-            changed = self.simulation.world.take_changed_cells()
+            changed = self.simulation.take_dirty_cells()
             self.grid_widget.refresh_dirty(changed)
 
     def _auto_epoch_end(self) -> None:
@@ -455,7 +458,7 @@ class MainWindow(QMainWindow):
         self.selected_creature = None
         self.grid_widget.selected_creature = None
         self.details_window.update_creature(None)
-        self.simulation.world.take_changed_cells()  # drain
+        self.simulation.take_dirty_cells()  # drain
         self._update_ui()
         self.grid_widget.refresh()
 
@@ -467,7 +470,7 @@ class MainWindow(QMainWindow):
         self.selected_creature = None
         self.grid_widget.selected_creature = None
         self.details_window.update_creature(None)
-        self.simulation.world.take_changed_cells()  # drain
+        self.simulation.take_dirty_cells()  # drain
         self._update_ui()
         self.grid_widget.refresh()
 
@@ -500,6 +503,7 @@ class MainWindow(QMainWindow):
             self.details_window.update_creature(found)
 
         self.grid_widget.creatures = self.simulation.creatures
+        self.grid_widget.pheromone_trail = self.simulation.pheromone_trail
         self.stats_graph.update_data(self.simulation.history)
         self._update_status()
 

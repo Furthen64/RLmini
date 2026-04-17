@@ -25,6 +25,7 @@ def create_offspring(
                 MemorySequence(steps=list(seq.steps))
                 for seq in parent.memories
             ],
+            follow_pheromone_trail=parent.follow_pheromone_trail,
         )
         offspring.append(child)
     return offspring
