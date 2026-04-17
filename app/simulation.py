@@ -435,6 +435,7 @@ class Simulation:
         return total
 
     def _other_pheromone_strength(self, creature: Creature, pos: Position) -> float:
+        """Return visible pheromone strength on a tile excluding this creature's own trail."""
         key = (pos.row, pos.col)
         visible = self.pheromone_trail.get(key, 0.0)
         own = creature.reverse_pheromone.get(key, 0.0)

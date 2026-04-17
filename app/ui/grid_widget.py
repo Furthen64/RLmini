@@ -97,6 +97,7 @@ class GridWidget(QWidget):
     ) -> None:
         if not self.show_pheromone_trail or strength <= 0.0:
             return
+        alpha = self._pheromone_alpha(strength)
         painter.fillRect(
             x,
             y,
@@ -106,12 +107,12 @@ class GridWidget(QWidget):
                 PHEROMONE_COLOR.red(),
                 PHEROMONE_COLOR.green(),
                 PHEROMONE_COLOR.blue(),
-                min(
-                    PHEROMONE_MAX_ALPHA,
-                    int(PHEROMONE_MAX_ALPHA * min(1.0, strength / 2.0)),
-                ),
+                alpha,
             ),
         )
+
+    def _pheromone_alpha(self, strength: float) -> int:
+        return int(PHEROMONE_MAX_ALPHA * min(1.0, strength / 2.0))
 
     def paintEvent(self, event: QPaintEvent) -> None:
         if self.world is None:
