@@ -101,7 +101,30 @@ class SimulationExploreTests(unittest.TestCase):
 
         self.assertGreater(simulation.pheromone_trail.get((3, 2), 0.0), 0.0)
         self.assertGreater(creature.reverse_pheromone.get((3, 2), 0.0), 0.0)
+        self.assertGreater(creature.visible_pheromone.get((3, 2), 0.0), 0.0)
         self.assertIn((3, 2), simulation.take_dirty_cells())
+
+    def test_execute_move_skips_pheromone_when_probability_misses(self) -> None:
+        config = WorldConfig(
+            width=5,
+            height=5,
+            creature_count=0,
+            food_count=0,
+            wall_count=0,
+            seed=1,
+            pheromone_drop_chance=0.0,
+        )
+        simulation = Simulation(config)
+        creature = Creature(id=4, position=Position(2, 2))
+        simulation.creatures = [creature]
+        simulation.world.set_tile(2, 2, Tile.CREATURE)
+
+        sense = simulation.world.get_sense_vector(creature.position)
+        simulation._execute_move(creature, Action.DOWN, sense, creature.mode)
+
+        self.assertEqual(simulation.pheromone_trail.get((3, 2), 0.0), 0.0)
+        self.assertEqual(creature.reverse_pheromone.get((3, 2), 0.0), 0.0)
+        self.assertEqual(creature.visible_pheromone.get((3, 2), 0.0), 0.0)
 
 
 if __name__ == "__main__":

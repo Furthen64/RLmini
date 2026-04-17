@@ -170,6 +170,7 @@ class Simulation:
     def _tick_creature(self, creature: Creature) -> None:
         self._tick_down_memory_cooldowns(creature)
         self._decay_reverse_pheromone(creature)
+        self._decay_visible_pheromone_for_creature(creature)
         pos = creature.position
         sense = self.world.get_sense_vector(pos)
         creature.current_sense_vector = list(sense)
@@ -348,7 +349,18 @@ class Simulation:
         self.pheromone_trail[key] = (
             self.pheromone_trail.get(key, 0.0) + VISIBLE_PHEROMONE_DEPOSIT
         )
+        creature.visible_pheromone[key] = (
+            creature.visible_pheromone.get(key, 0.0) + VISIBLE_PHEROMONE_DEPOSIT
+        )
         self._dirty_pheromone_cells.add(key)
+
+    def _decay_visible_pheromone_for_creature(self, creature: Creature) -> None:
+        updated: dict[tuple[int, int], float] = {}
+        for key, strength in creature.visible_pheromone.items():
+            next_strength = strength * VISIBLE_PHEROMONE_DECAY
+            if next_strength >= VISIBLE_PHEROMONE_PRUNE_THRESHOLD:
+                updated[key] = next_strength
+        creature.visible_pheromone = updated
 
     def _maybe_record_pheromone(self, creature: Creature) -> None:
         if self.rng.random() >= self.config.pheromone_drop_chance:
@@ -438,7 +450,7 @@ class Simulation:
         """Return visible pheromone strength on a tile excluding this creature's own trail."""
         key = (pos.row, pos.col)
         visible = self.pheromone_trail.get(key, 0.0)
-        own = creature.reverse_pheromone.get(key, 0.0)
+        own = creature.visible_pheromone.get(key, 0.0)
         return max(0.0, visible - own)
 
     def _recent_progress_ratio(self, positions: list[Position]) -> float:
@@ -739,6 +751,7 @@ class Simulation:
             creature.memory_cooldowns = {}
             creature.memory_loop_strikes = {}
             creature.reverse_pheromone = {}
+            creature.visible_pheromone = {}
         self.pheromone_trail = {}
         self._dirty_pheromone_cells = set()
 
