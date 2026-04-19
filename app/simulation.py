@@ -474,7 +474,23 @@ class Simulation:
             if self._has_repeated_suffix_pattern(suffix, include_action=False):
                 return suffix
 
+        if self._has_position_revisit(recent):
+            return recent
+
         return None
+
+    def _has_position_revisit(
+        self,
+        steps: list[tuple[Position, list[int], int, Optional[int]]],
+    ) -> bool:
+        """Return True if any grid position is visited more than once in steps."""
+        seen: set[tuple[int, int]] = set()
+        for pos, _, _, _ in steps:
+            key = (pos.row, pos.col)
+            if key in seen:
+                return True
+            seen.add(key)
+        return False
 
     def _has_repeated_suffix_pattern(
         self,
