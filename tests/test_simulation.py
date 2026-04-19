@@ -1,6 +1,6 @@
 import unittest
 
-from app.enums import Action, Tile
+from app.enums import Action, Tile, CreatureMode
 from app.models import Creature, Position, WorldConfig
 from app.simulation import Simulation
 from app.world import World
@@ -217,6 +217,186 @@ class WorldLineOfSightTests(unittest.TestCase):
         visible = self.world.get_visible_food(creature_pos)
 
         self.assertNotIn((3, 3), visible)
+
+
+class ExplorationScoringTests(unittest.TestCase):
+    """Tests for frontier/novelty-bias explore-mode scoring."""
+
+    def _make_sim(self, **extra_config) -> Simulation:
+        """Return a small, deterministic, wall-bordered 5x5 simulation."""
+        config = WorldConfig(
+            width=5,
+            height=5,
+            creature_count=0,
+            food_count=0,
+            wall_count=0,
+            seed=1,
+            pheromone_drop_chance=0.0,
+            **extra_config,
+        )
+        sim = Simulation(config)
+        # Ensure border walls, interior empty
+        for row in range(config.height):
+            for col in range(config.width):
+                tile = (
+                    Tile.WALL
+                    if row in (0, config.height - 1) or col in (0, config.width - 1)
+                    else Tile.EMPTY
+                )
+                sim.world.set_tile(row, col, tile)
+        return sim
+
+    def _place_creature(self, sim: Simulation, row: int, col: int) -> Creature:
+        creature = Creature(id=99, position=Position(row, col))
+        sim.world.set_tile(row, col, Tile.CREATURE)
+        sim.creatures = [creature]
+        return creature
+
+    # ------------------------------------------------------------------
+
+    def test_explore_prefers_unvisited_tile_over_visited(self) -> None:
+        """Score-based _explore must choose a never-visited tile over a heavily visited one."""
+        sim = self._make_sim()
+        creature = self._place_creature(sim, 2, 2)
+
+        # Mark (2,1) as visited many times; (2,3) and others are fresh
+        creature.visit_count_by_pos[(2, 1)] = 50
+        # Block UP and DOWN so only LEFT and RIGHT are legal
+        sim.world.set_tile(1, 2, Tile.WALL)
+        sim.world.set_tile(3, 2, Tile.WALL)
+
+        sense = sim.world.get_sense_vector(creature.position)
+        sim._explore(creature, sense, creature.position)
+
+        # Should have moved RIGHT (to unvisited (2,3)) not LEFT (to heavily visited (2,1))
+        self.assertEqual(creature.position, Position(2, 3))
+
+    def test_explore_recent_position_penalty_discourages_loops(self) -> None:
+        """Tiles in recent_positions should be penalised, causing the creature to avoid them."""
+        sim = self._make_sim()
+        creature = self._place_creature(sim, 2, 2)
+
+        # Mark (3,2) as a recent position; (1,2) is fresh
+        creature.recent_positions = [(3, 2)]
+        # Block LEFT/RIGHT so only UP and DOWN are legal
+        sim.world.set_tile(2, 1, Tile.WALL)
+        sim.world.set_tile(2, 3, Tile.WALL)
+
+        sense = sim.world.get_sense_vector(creature.position)
+        sim._explore(creature, sense, creature.position)
+
+        # (3,2) is penalised; creature should go UP to fresh (1,2)
+        self.assertEqual(creature.position, Position(1, 2))
+
+    def test_explore_reverse_penalty_discourages_backtrack(self) -> None:
+        """Immediate reversal should be penalised and avoided when alternatives exist."""
+        sim = self._make_sim()
+        creature = self._place_creature(sim, 2, 2)
+
+        # Creature last moved RIGHT (Action.RIGHT); reversing would be LEFT
+        creature.current_action = Action.RIGHT
+        # Block DOWN so only LEFT and UP are legal from (2,2)
+        sim.world.set_tile(3, 2, Tile.WALL)
+        sim.world.set_tile(2, 3, Tile.WALL)  # RIGHT is also blocked
+        # UP (1,2) and LEFT (2,1) are available; LEFT is the reversal
+
+        sense = sim.world.get_sense_vector(creature.position)
+        sim._explore(creature, sense, creature.position)
+
+        # Should prefer UP (not the reversal LEFT)
+        self.assertEqual(creature.position, Position(1, 2))
+
+    def test_explore_scores_stored_for_debug(self) -> None:
+        """last_explore_scores must be populated after an explore step."""
+        sim = self._make_sim()
+        creature = self._place_creature(sim, 2, 2)
+
+        sense = sim.world.get_sense_vector(creature.position)
+        sim._explore(creature, sense, creature.position)
+
+        self.assertGreater(len(creature.last_explore_scores), 0)
+        # Each entry: (action, pos_key, score, new_tile, in_recent, is_reversal)
+        for entry in creature.last_explore_scores:
+            action, key, score, new_tile, in_recent, is_rev = entry
+            self.assertIsInstance(score, float)
+            self.assertIsInstance(new_tile, bool)
+            self.assertIsInstance(in_recent, bool)
+            self.assertIsInstance(is_rev, bool)
+
+    def test_adjacent_food_overrides_exploration(self) -> None:
+        """Adjacent food must be eaten immediately, overriding explore scoring."""
+        sim = self._make_sim()
+        creature = self._place_creature(sim, 2, 2)
+        # Place food directly below
+        sim.world.set_tile(3, 2, Tile.FOOD)
+
+        sim._tick_creature(creature)
+
+        self.assertEqual(creature.position, Position(3, 2))
+        self.assertEqual(creature.food_score, 1)
+        self.assertEqual(creature.mode, CreatureMode.FOOD_DIRECT)
+
+    def test_visible_food_overrides_exploration(self) -> None:
+        """Visible food (sense-radius reachable) must override pure explore mode."""
+        sim = self._make_sim(sense_radius=2)
+        # Larger world so food can be within sense radius but not adjacent
+        config = WorldConfig(
+            width=9, height=9,
+            creature_count=0, food_count=0, wall_count=0,
+            seed=1, pheromone_drop_chance=0.0, sense_radius=2,
+        )
+        sim2 = Simulation(config)
+        for row in range(9):
+            for col in range(9):
+                tile = (
+                    Tile.WALL
+                    if row in (0, 8) or col in (0, 8)
+                    else Tile.EMPTY
+                )
+                sim2.world.set_tile(row, col, tile)
+        creature = Creature(id=1, position=Position(4, 4))
+        sim2.world.set_tile(4, 4, Tile.CREATURE)
+        sim2.creatures = [creature]
+        # Food two steps right, within sense radius but not adjacent
+        sim2.world.set_tile(4, 6, Tile.FOOD)
+
+        sim2._tick_creature(creature)
+
+        # Creature should have moved toward (4,6): must be at (4,5) or (4,6)
+        self.assertIn(creature.position, [Position(4, 5), Position(4, 6)])
+        self.assertEqual(creature.mode, CreatureMode.FOOD_DIRECT)
+
+    def test_epoch_reset_clears_exploration_state(self) -> None:
+        """epoch_reset must zero visit_count_by_pos, recent_positions, and last_explore_scores."""
+        sim = self._make_sim()
+        creature = self._place_creature(sim, 2, 2)
+
+        # Populate explore state manually
+        creature.visit_count_by_pos = {(2, 2): 5, (2, 3): 2}
+        creature.recent_positions = [(2, 2), (2, 3), (2, 2)]
+        creature.last_explore_scores = [(Action.RIGHT, (2, 3), 8.0, True, False, False)]
+
+        sim.epoch_reset()
+
+        self.assertEqual(creature.visit_count_by_pos, {})
+        self.assertEqual(creature.recent_positions, [])
+        self.assertEqual(creature.last_explore_scores, [])
+
+    def test_visit_count_increments_on_move(self) -> None:
+        """visit_count_by_pos should increment each time a creature occupies a tile."""
+        sim = self._make_sim()
+        creature = self._place_creature(sim, 2, 2)
+        # Block all but RIGHT
+        sim.world.set_tile(1, 2, Tile.WALL)
+        sim.world.set_tile(3, 2, Tile.WALL)
+        sim.world.set_tile(2, 1, Tile.WALL)
+
+        sense = sim.world.get_sense_vector(creature.position)
+        sim._execute_move(creature, Action.RIGHT, sense, CreatureMode.EXPLORE)
+
+        # Creature is now at (2,3); that tile should have been visited once
+        self.assertEqual(creature.visit_count_by_pos.get((2, 3), 0), 1)
+        self.assertIn((2, 3), creature.recent_positions)
 
 
 if __name__ == "__main__":

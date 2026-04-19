@@ -5,6 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from app.config import SETTINGS_VERSION, DEFAULT_RNG_SEED
+from app.models import (
+    EXPLORE_HISTORY_WINDOW_DEFAULT,
+    EXPLORE_NEW_TILE_BONUS_DEFAULT,
+    EXPLORE_LOW_VISIT_FACTOR_DEFAULT,
+    EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT,
+    EXPLORE_REVERSE_PENALTY_DEFAULT,
+)
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +52,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "details_window_geometry": None,
     "editor_window_geometry": None,
     "editor_recent_map_path": None,
+    # Exploration novelty scoring weights
+    "explore_history_window": EXPLORE_HISTORY_WINDOW_DEFAULT,
+    "explore_new_tile_bonus": EXPLORE_NEW_TILE_BONUS_DEFAULT,
+    "explore_low_visit_factor": EXPLORE_LOW_VISIT_FACTOR_DEFAULT,
+    "explore_recent_repeat_penalty": EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT,
+    "explore_reverse_penalty": EXPLORE_REVERSE_PENALTY_DEFAULT,
 }
 
 

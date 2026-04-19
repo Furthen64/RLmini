@@ -234,6 +234,11 @@ class MainWindow(QMainWindow):
             match_threshold=s.get("match_threshold", 0.75),
             cell_size=s.get("cell_size", 32),
             sense_radius=s.get("sense_radius", 1),
+            explore_history_window=int(s.get("explore_history_window", 15)),
+            explore_new_tile_bonus=float(s.get("explore_new_tile_bonus", 10.0)),
+            explore_low_visit_factor=float(s.get("explore_low_visit_factor", 1.0)),
+            explore_recent_repeat_penalty=float(s.get("explore_recent_repeat_penalty", 5.0)),
+            explore_reverse_penalty=float(s.get("explore_reverse_penalty", 3.0)),
         )
         if s.get("seed_fixed"):
             seed: Optional[int] = s.get("seed")

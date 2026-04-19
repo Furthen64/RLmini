@@ -16,7 +16,6 @@ ACTION_NAMES: dict[int, str] = {
     Action.RIGHT: "RIGHT",
     Action.IDLE: "IDLE",
 }
-
 MODE_NAMES: dict[int, str] = {
     CreatureMode.FOOD_DIRECT: "FOOD_DIRECT",
     CreatureMode.MEMORY_REPLAY: "MEMORY_REPLAY",
@@ -102,6 +101,20 @@ class DetailsWindow(QWidget):
         self.copy_btn.clicked.connect(self._copy_to_clipboard)
         layout.addWidget(self.copy_btn)
 
+        # Exploration debug
+        explore_group = QGroupBox("Exploration Debug")
+        explore_layout = QVBoxLayout(explore_group)
+        self.explore_visit_label = QLabel("Visit count (current tile): -")
+        self.explore_recent_label = QLabel("Recent positions: -")
+        self.explore_scores_text = QTextEdit()
+        self.explore_scores_text.setReadOnly(True)
+        self.explore_scores_text.setFixedHeight(100)
+        for w in [self.explore_visit_label, self.explore_recent_label]:
+            explore_layout.addWidget(w)
+        explore_layout.addWidget(QLabel("Last explore candidate scores:"))
+        explore_layout.addWidget(self.explore_scores_text)
+        layout.addWidget(explore_group)
+
         layout.addStretch()
 
     def update_creature(self, creature: Creature | None) -> None:
@@ -120,6 +133,9 @@ class DetailsWindow(QWidget):
             self.steps_text.setPlainText("")
             self.active_mem_label.setText("-")
             self.memories_text.setPlainText("")
+            self.explore_visit_label.setText("Visit count (current tile): -")
+            self.explore_recent_label.setText("Recent positions: -")
+            self.explore_scores_text.setPlainText("")
             return
 
         # Skip full refresh if creature state is unchanged
@@ -127,6 +143,7 @@ class DetailsWindow(QWidget):
             creature.id, creature.position.row, creature.position.col,
             creature.mode, creature.current_action, creature.food_score,
             creature.active_memory_idx, len(creature.memories),
+            len(creature.last_explore_scores),
         )
         if key == self._last_update_key:
             return
@@ -187,6 +204,33 @@ class DetailsWindow(QWidget):
                 )
         self.memories_text.setPlainText(
             "\n".join(mem_lines) if mem_lines else "(no memories)"
+        )
+
+        # Exploration debug
+        pos_key = (creature.position.row, creature.position.col)
+        vc = creature.visit_count_by_pos.get(pos_key, 0)
+        self.explore_visit_label.setText(f"Visit count (current tile): {vc}")
+
+        recent = creature.recent_positions[-15:] if creature.recent_positions else []
+        recent_str = ", ".join(f"({r},{c})" for r, c in recent) or "(none)"
+        self.explore_recent_label.setText(f"Recent positions [{len(creature.recent_positions)}]: {recent_str}")
+
+        score_lines = []
+        for action, key, score, new_tile, in_recent, is_rev in creature.last_explore_scores:
+            flags = []
+            if new_tile:
+                flags.append("NEW")
+            if in_recent:
+                flags.append("RECENT!")
+            if is_rev:
+                flags.append("REV!")
+            flag_str = " ".join(flags)
+            score_lines.append(
+                f"  {ACTION_NAMES.get(action, '?'):5s} ({key[0]},{key[1]})"
+                f"  score={score:+.2f}  {flag_str}"
+            )
+        self.explore_scores_text.setPlainText(
+            "\n".join(score_lines) if score_lines else "(not in explore mode)"
         )
 
     def refresh(self) -> None:
@@ -262,6 +306,33 @@ class DetailsWindow(QWidget):
                     )
         else:
             lines.append("  (no memories)")
+        lines.append("")
+
+        # Exploration debug
+        lines.append("[Exploration State]")
+        pos_key = (c.position.row, c.position.col)
+        vc = c.visit_count_by_pos.get(pos_key, 0)
+        lines.append(f"  Visit count (current tile): {vc}")
+        lines.append(f"  Recent positions ({len(c.recent_positions)} total):")
+        recent = c.recent_positions[-15:]
+        lines.append("  " + ", ".join(f"({r},{c_})" for r, c_ in recent) or "  (none)")
+        if c.last_explore_scores:
+            lines.append("  Last explore candidate scores:")
+            for action, key, score, new_tile, in_recent, is_rev in c.last_explore_scores:
+                flags = []
+                if new_tile:
+                    flags.append("NEW")
+                if in_recent:
+                    flags.append("RECENT!")
+                if is_rev:
+                    flags.append("REV!")
+                flag_str = " ".join(flags)
+                lines.append(
+                    f"    {ACTION_NAMES.get(action, '?'):5s} ({key[0]},{key[1]})"
+                    f"  score={score:+.2f}  {flag_str}"
+                )
+        else:
+            lines.append("  (not in explore mode or no candidates)")
 
         return "\n".join(lines)
 

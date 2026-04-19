@@ -190,6 +190,8 @@ class Simulation:
             creature.recent_steps.append((pos, list(sense), action, None))
             if len(creature.recent_steps) > MAX_RECENT_STEPS:
                 creature.recent_steps.pop(0)
+            # Track visits for exploration novelty scoring
+            self._record_visit(creature)
             creature.current_action = action
             creature.last_action = action
             # Try to learn
@@ -665,18 +667,76 @@ class Simulation:
         )
 
     def _explore(self, creature: Creature, sense: list[int], pos: Position) -> None:
+        """Prefer less-explored tiles and avoid recently repeated tracks.
+
+        Scores each legal move by:
+          - big bonus for never-visited tiles (new-tile bonus)
+          - smaller bonus proportional to inverse visit count (low-visit bonus)
+          - strong penalty for tiles in the recent-position window (loop avoidance)
+          - moderate penalty for the exact reversal of the previous move
+        The highest-scoring move is chosen; ties are broken randomly.
+        """
         legal = self.world.get_legal_moves(pos)
         if not legal:
+            creature.last_explore_scores = []
             self._execute_move(creature, Action.IDLE, sense, CreatureMode.EXPLORE)
             return
 
-        # Avoid immediate reversal if another option exists
-        legal = self._prefer_non_reversal_moves(legal, creature.current_action)
-
         if not creature.last_replay_fail_reason:
             creature.last_replay_fail_reason = "no match"
-        action = self._choose_action_with_lowest_revisit_penalty(creature, pos, legal)
-        self._execute_move(creature, action, sense, CreatureMode.EXPLORE)
+
+        window = self.config.explore_history_window
+        recent_set: set[tuple[int, int]] = set(creature.recent_positions[-window:])
+
+        reversal_map: dict[int, int] = {
+            Action.LEFT: Action.RIGHT,
+            Action.RIGHT: Action.LEFT,
+            Action.UP: Action.DOWN,
+            Action.DOWN: Action.UP,
+        }
+        # current_action holds the action executed in the previous tick
+        prev_action = creature.current_action
+
+        scored: list[tuple[float, int, tuple[int, int], bool, bool, bool]] = []
+        for action in legal:
+            candidate = self.world.move_pos(pos, action)
+            candidate_key = (candidate.row, candidate.col)
+
+            vc = creature.visit_count_by_pos.get(candidate_key, 0)
+            new_tile = vc == 0
+            in_recent = candidate_key in recent_set
+            is_reversal = (
+                prev_action is not None
+                and prev_action in reversal_map
+                and action == reversal_map[prev_action]
+            )
+
+            score = 0.0
+            if new_tile:
+                score += self.config.explore_new_tile_bonus
+            else:
+                score += self.config.explore_low_visit_factor / (1 + vc)
+            if in_recent:
+                score -= self.config.explore_recent_repeat_penalty
+            if is_reversal:
+                score -= self.config.explore_reverse_penalty
+
+            scored.append((score, action, candidate_key, new_tile, in_recent, is_reversal))
+
+        # Store all scores for debug visibility
+        creature.last_explore_scores = [
+            (action, key, s, new_tile, in_recent, is_rev)
+            for s, action, key, new_tile, in_recent, is_rev in scored
+        ]
+
+        best_score = max(s for s, *_ in scored)
+        best_candidates = [
+            (action, key, new_tile, in_recent, is_rev)
+            for s, action, key, new_tile, in_recent, is_rev in scored
+            if s == best_score
+        ]
+        chosen_action, *_ = self.rng.choice(best_candidates)
+        self._execute_move(creature, chosen_action, sense, CreatureMode.EXPLORE)
 
     def _execute_move(
         self, creature: Creature, action: int, sense: list[int], mode: int
@@ -700,11 +760,20 @@ class Simulation:
             self.world.set_tile(new_pos.row, new_pos.col, Tile.CREATURE)
             creature.position = new_pos
 
+        # Track visits for exploration novelty scoring
+        self._record_visit(creature)
+
         # Append the step to recent_steps
         creature.recent_steps.append((pos, list(sense), action, creature.active_memory_idx))
         if len(creature.recent_steps) > MAX_RECENT_STEPS:
             creature.recent_steps.pop(0)
         self._maybe_record_pheromone(creature)
+
+    def _record_visit(self, creature: Creature) -> None:
+        """Increment visit count and append to recent_positions for the creature's current tile."""
+        key = (creature.position.row, creature.position.col)
+        creature.visit_count_by_pos[key] = creature.visit_count_by_pos.get(key, 0) + 1
+        creature.recent_positions.append(key)
 
     def _direction_to(self, src: Position, dst: Position) -> int:
         dr = dst.row - src.row
@@ -768,6 +837,9 @@ class Simulation:
             creature.memory_loop_strikes = {}
             creature.reverse_pheromone = {}
             creature.visible_pheromone = {}
+            creature.visit_count_by_pos = {}
+            creature.recent_positions = []
+            creature.last_explore_scores = []
         self.pheromone_trail = {}
         self._dirty_pheromone_cells = set()
 
