@@ -79,12 +79,43 @@ class World:
                 result.append((nr, nc))
         return result
 
+    def has_line_of_sight(
+        self, from_row: int, from_col: int, to_row: int, to_col: int
+    ) -> bool:
+        """Return True if no wall blocks the straight line between two cells.
+
+        Uses Bresenham's line algorithm to trace every cell along the path.
+        The starting cell and destination cell are not checked (they are the
+        creature and food tiles respectively); only intermediate cells are
+        tested for walls.
+        """
+        r, c = from_row, from_col
+        r1, c1 = to_row, to_col
+        dr = abs(r1 - r)
+        dc = abs(c1 - c)
+        sr = 1 if r1 > r else -1
+        sc = 1 if c1 > c else -1
+        err = dr - dc
+        while r != r1 or c != c1:
+            e2 = 2 * err
+            if e2 > -dc:
+                err -= dc
+                r += sr
+            if e2 < dr:
+                err += dr
+                c += sc
+            # Skip the destination cell (it is the food tile, not a blocker)
+            if (r != r1 or c != c1) and self._sample_tile(r, c) == Tile.WALL:
+                return False
+        return True
+
     def get_visible_food(self, pos: Position) -> list[tuple[int, int]]:
         result = []
         for dr, dc in self.sense_offsets:
             nr, nc = pos.row + dr, pos.col + dc
             if self._sample_tile(nr, nc) == Tile.FOOD:
-                result.append((nr, nc))
+                if self.has_line_of_sight(pos.row, pos.col, nr, nc):
+                    result.append((nr, nc))
         return result
 
     def get_legal_moves(self, pos: Position) -> list[int]:
