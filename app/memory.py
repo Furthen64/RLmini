@@ -1,7 +1,7 @@
 import random
 from typing import Optional
 
-from app.enums import Action
+from app.enums import Action, Tile
 from app.models import MemoryStep, MemorySequence, Creature, Position
 
 REVERSAL_PAIRS: set[tuple[int, int]] = {
@@ -41,6 +41,13 @@ def find_best_memory_match(
         for step_idx, step in enumerate(mem_seq.steps):
             score = sense_match_score(current_sense, step.sense_vector)
             if score < threshold:
+                continue
+            # Skip steps where the memory recorded FOOD at a position that is
+            # now EMPTY — the food the creature was navigating toward is gone.
+            if any(
+                m == Tile.FOOD and c == Tile.EMPTY
+                for m, c in zip(step.sense_vector, current_sense)
+            ):
                 continue
             seq_len = len(mem_seq.steps)
             if score > best_score:
