@@ -188,7 +188,7 @@ class Simulation:
             creature.mode = CreatureMode.FOOD_DIRECT
             action = self._direction_to(pos, new_pos)
             creature.recent_steps.append((pos, list(sense), action, None))
-            if len(creature.recent_steps) > 4:
+            if len(creature.recent_steps) > MAX_RECENT_STEPS:
                 creature.recent_steps.pop(0)
             creature.current_action = action
             creature.last_action = action
@@ -196,7 +196,8 @@ class Simulation:
             new_mem = try_create_memory(creature, creature.recent_steps)
             if new_mem is not None:
                 creature.memories.append(new_mem)
-            creature.recent_steps.clear()
+            # Keep recent_steps so loop detection and revisit penalty have
+            # immediate context on the ticks that follow eating.
             creature.active_memory_idx = None
             creature.active_step_idx = None
             creature.last_replayed_memory_idx = None
