@@ -17,7 +17,7 @@ from app.map_format import (
     load_map_document,
     map_document_from_world,
 )
-from app.models import WorldConfig, Creature
+from app.models import WorldConfig, Creature, TickSnapshot
 from app.simulation import Simulation
 from app.reproduction import reproduce
 from app.settings_store import load_settings, save_settings
@@ -40,6 +40,7 @@ class MainWindow(QMainWindow):
         self.loaded_map: Optional[MapDocument] = None
         self.map_editor_window: Optional[MapEditorWindow] = None
         self.selected_creature: Optional[Creature] = None
+        self._graph_initial_snapshot: Optional[TickSnapshot] = None
         self._running = False
         self._tick_count_this_epoch = 0
         self._last_status_text = ""
@@ -135,10 +136,13 @@ class MainWindow(QMainWindow):
 
     def _apply_settings_to_ui(self) -> None:
         self.settings_panel.apply_settings(self.settings)
+        self.stats_graph.apply_settings(self.settings)
 
     def _save_settings(self) -> None:
         new_s = self.settings_panel.get_settings()
         self.settings.update(new_s)
+        self.settings.update(self.stats_graph.get_settings())
+        self.stats_graph.apply_settings(self.settings)
         geom = self.saveGeometry()
         self.settings["main_window_geometry"] = geom.toBase64().data().decode()
         dgeom = self.details_window.saveGeometry()
@@ -246,16 +250,30 @@ class MainWindow(QMainWindow):
             seed = random.randint(0, 999_999)
         self.simulation = Simulation(config, rng_seed=seed, authored_map=self.loaded_map)
         self.grid_widget.apply_settings(self.settings)
+        self.stats_graph.set_epoch_length(config.epoch_length)
+        self.stats_graph.set_tick_interval_ms(config.tick_interval_ms)
         self.grid_widget.set_world(
             self.simulation.world,
             self.simulation.creatures,
             self.simulation.pheromone_trail,
         )
+        self._capture_graph_initial_snapshot()
         self.selected_creature = None
         self.details_window.update_creature(None)
         self.stats_graph.clear()
         self._tick_count_this_epoch = 0
         self._update_status()
+
+    def _capture_graph_initial_snapshot(self) -> None:
+        if self.simulation is None:
+            self._graph_initial_snapshot = None
+            return
+        self._graph_initial_snapshot = TickSnapshot(
+            tick=0,
+            food_remaining=self.simulation.stats.food_remaining,
+            best_score=self.simulation.stats.best_creature_score,
+            avg_score=self.simulation.stats.avg_creature_score,
+        )
 
     def _choose_and_load_map(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -459,6 +477,7 @@ class MainWindow(QMainWindow):
         )
         self.simulation._next_creature_id += len(offspring)
         self.simulation.epoch_reset(offspring)
+        self._capture_graph_initial_snapshot()
         self._tick_count_this_epoch = 0
         self.selected_creature = None
         self.grid_widget.selected_creature = None
@@ -471,6 +490,7 @@ class MainWindow(QMainWindow):
         if self.simulation is None:
             return
         self.simulation.epoch_reset()
+        self._capture_graph_initial_snapshot()
         self._tick_count_this_epoch = 0
         self.selected_creature = None
         self.grid_widget.selected_creature = None
@@ -509,7 +529,10 @@ class MainWindow(QMainWindow):
 
         self.grid_widget.creatures = self.simulation.creatures
         self.grid_widget.pheromone_trail = self.simulation.pheromone_trail
-        self.stats_graph.update_data(self.simulation.history)
+        self.stats_graph.update_data(
+            self.simulation.history,
+            self._graph_initial_snapshot,
+        )
         self._update_status()
 
     def _update_status(self) -> None:
