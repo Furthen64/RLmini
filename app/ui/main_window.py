@@ -1,4 +1,5 @@
 import random
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -14,8 +15,11 @@ from app.map_format import (
     MAP_FOOD,
     MAP_WALL,
     MapDocument,
+    get_map_best_food_time,
     load_map_document,
     map_document_from_world,
+    save_map_document,
+    update_map_best_food_time,
 )
 from app.models import WorldConfig, Creature, TickSnapshot
 from app.simulation import Simulation
@@ -41,6 +45,7 @@ class MainWindow(QMainWindow):
         self.map_editor_window: Optional[MapEditorWindow] = None
         self.selected_creature: Optional[Creature] = None
         self._graph_initial_snapshot: Optional[TickSnapshot] = None
+        self._all_food_recorded_for_epoch = False
         self._running = False
         self._tick_count_this_epoch = 0
         self._last_status_text = ""
@@ -258,9 +263,11 @@ class MainWindow(QMainWindow):
             self.simulation.pheromone_trail,
         )
         self._capture_graph_initial_snapshot()
+        self._all_food_recorded_for_epoch = False
         self.selected_creature = None
         self.details_window.update_creature(None)
         self.stats_graph.clear()
+        self._sync_best_time_marker()
         self._tick_count_this_epoch = 0
         self._update_status()
 
@@ -274,6 +281,51 @@ class MainWindow(QMainWindow):
             best_score=self.simulation.stats.best_creature_score,
             avg_score=self.simulation.stats.avg_creature_score,
         )
+
+    def _sync_best_time_marker(self) -> None:
+        if self.loaded_map is None:
+            self.stats_graph.set_best_time_marker(None)
+            return
+
+        best_time = get_map_best_food_time(self.loaded_map)
+        if best_time is None:
+            self.stats_graph.set_best_time_marker(None)
+            return
+
+        seconds, ticks, achieved_at = best_time
+        self.stats_graph.set_best_time_marker(ticks, seconds, achieved_at)
+
+    def _maybe_record_map_best_time(self) -> None:
+        if (
+            self.simulation is None
+            or self.loaded_map is None
+            or self._all_food_recorded_for_epoch
+            or self.simulation.stats.food_remaining != 0
+        ):
+            return
+
+        self._all_food_recorded_for_epoch = True
+        elapsed_seconds = (
+            self.simulation.stats.tick * self.settings.get("tick_interval_ms", 100)
+        ) / 1000.0
+        achieved_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+        updated = update_map_best_food_time(
+            self.loaded_map,
+            elapsed_seconds=elapsed_seconds,
+            tick=self.simulation.stats.tick,
+            achieved_at=achieved_at,
+        )
+        if not updated:
+            return
+
+        self._sync_best_time_marker()
+
+        loaded_map_path = self.settings.get("loaded_map_path")
+        if isinstance(loaded_map_path, str) and loaded_map_path:
+            try:
+                save_map_document(self.loaded_map, loaded_map_path)
+            except Exception:
+                pass
 
     def _choose_and_load_map(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -454,6 +506,7 @@ class MainWindow(QMainWindow):
             return
         self.simulation.tick()
         self._tick_count_this_epoch += 1
+        self._maybe_record_map_best_time()
         epoch_len = self.settings.get("epoch_length", 200)
         if self._tick_count_this_epoch >= epoch_len:
             self._auto_epoch_end()
@@ -478,6 +531,7 @@ class MainWindow(QMainWindow):
         self.simulation._next_creature_id += len(offspring)
         self.simulation.epoch_reset(offspring)
         self._capture_graph_initial_snapshot()
+        self._all_food_recorded_for_epoch = False
         self._tick_count_this_epoch = 0
         self.selected_creature = None
         self.grid_widget.selected_creature = None
@@ -491,6 +545,7 @@ class MainWindow(QMainWindow):
             return
         self.simulation.epoch_reset()
         self._capture_graph_initial_snapshot()
+        self._all_food_recorded_for_epoch = False
         self._tick_count_this_epoch = 0
         self.selected_creature = None
         self.grid_widget.selected_creature = None
@@ -533,6 +588,7 @@ class MainWindow(QMainWindow):
             self.simulation.history,
             self._graph_initial_snapshot,
         )
+        self._sync_best_time_marker()
         self._update_status()
 
     def _update_status(self) -> None:

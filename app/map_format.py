@@ -13,6 +13,9 @@ MAP_FOOD = 2
 MAP_SPAWN = 3
 SUPPORTED_MAP_TOKENS = {MAP_EMPTY, MAP_WALL, MAP_FOOD, MAP_SPAWN}
 MAP_VERSION = "1"
+BEST_FOOD_TIME_SECONDS_KEY = "best_food_time_seconds"
+BEST_FOOD_TIME_TICKS_KEY = "best_food_time_ticks"
+BEST_FOOD_TIME_ACHIEVED_AT_KEY = "best_food_time_achieved_at"
 
 
 @dataclass
@@ -62,6 +65,39 @@ def save_map_document(doc: MapDocument, path: str | Path) -> None:
     validated = normalize_map_document(doc)
     map_path = Path(path)
     map_path.write_text(serialize_map_text(validated), encoding="utf-8")
+
+
+def get_map_best_food_time(doc: MapDocument) -> tuple[float, int, str] | None:
+    metadata = doc.metadata
+    seconds_text = metadata.get(BEST_FOOD_TIME_SECONDS_KEY)
+    ticks_text = metadata.get(BEST_FOOD_TIME_TICKS_KEY)
+    achieved_at = metadata.get(BEST_FOOD_TIME_ACHIEVED_AT_KEY, "").strip()
+    if not seconds_text or not ticks_text or not achieved_at:
+        return None
+    try:
+        seconds = float(seconds_text)
+        ticks = int(ticks_text)
+    except ValueError:
+        return None
+    if seconds < 0.0 or ticks < 0:
+        return None
+    return seconds, ticks, achieved_at
+
+
+def update_map_best_food_time(
+    doc: MapDocument,
+    *,
+    elapsed_seconds: float,
+    tick: int,
+    achieved_at: str,
+) -> bool:
+    existing = get_map_best_food_time(doc)
+    if existing is not None and elapsed_seconds >= existing[0]:
+        return False
+    doc.metadata[BEST_FOOD_TIME_SECONDS_KEY] = f"{elapsed_seconds:.1f}"
+    doc.metadata[BEST_FOOD_TIME_TICKS_KEY] = str(tick)
+    doc.metadata[BEST_FOOD_TIME_ACHIEVED_AT_KEY] = achieved_at
+    return True
 
 
 def parse_map_text(text: str) -> MapDocument:

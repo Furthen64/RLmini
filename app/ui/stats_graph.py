@@ -11,6 +11,7 @@ FOOD_COLOR = (100, 220, 80)
 BEST_SCORE_COLOR = (255, 180, 50)
 AVG_SCORE_COLOR = (80, 160, 240)
 MARKER_COLOR = (255, 110, 110)
+BEST_TIME_MARKER_COLOR = (70, 210, 110)
 
 
 class StatsGraph(QWidget):
@@ -18,6 +19,7 @@ class StatsGraph(QWidget):
         super().__init__(parent)
         self._epoch_length = 200
         self._tick_interval_ms = 100
+        self._best_time_tooltip = ""
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -63,7 +65,18 @@ class StatsGraph(QWidget):
             size=9,
             symbol="o",
         )
+        self.best_time_marker = pg.ScatterPlotItem(
+            [],
+            [],
+            pen=pg.mkPen(color=BEST_TIME_MARKER_COLOR, width=1),
+            brush=pg.mkBrush(BEST_TIME_MARKER_COLOR),
+            size=10,
+            symbol="t",
+            hoverable=True,
+            tip=self._best_time_marker_tip,
+        )
         self.plot_widget.addItem(self.food_empty_markers)
+        self.plot_widget.addItem(self.best_time_marker)
 
         layout.addWidget(self.plot_widget)
 
@@ -115,6 +128,26 @@ class StatsGraph(QWidget):
 
     def set_tick_interval_ms(self, tick_interval_ms: int) -> None:
         self._tick_interval_ms = max(1, tick_interval_ms)
+
+    def set_best_time_marker(
+        self,
+        best_time_ticks: int | None,
+        best_time_seconds: float | None = None,
+        achieved_at: str = "",
+    ) -> None:
+        if best_time_ticks is None or best_time_seconds is None:
+            self._best_time_tooltip = ""
+            self.best_time_marker.setData([], [])
+            return
+
+        self._best_time_tooltip = (
+            f"Best time: {best_time_seconds:.1f} seconds\n"
+            f"Date of highscore: {achieved_at}"
+        )
+        self.best_time_marker.setData([best_time_ticks], [0])
+
+    def _best_time_marker_tip(self, x: float, y: float, data: object) -> str:
+        return self._best_time_tooltip
 
     def _update_curve_visibility(self) -> None:
         self.food_curve.setVisible(self.cb_food.isChecked())
@@ -175,5 +208,6 @@ class StatsGraph(QWidget):
         self.best_curve.setData([], [])
         self.avg_curve.setData([], [])
         self.food_empty_markers.setData([], [])
+        self.best_time_marker.setData([], [])
         self.info_label.setText("")
         self.plot_widget.setXRange(0, self._epoch_length, padding=0)
