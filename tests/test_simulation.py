@@ -3,6 +3,7 @@ import unittest
 from app.enums import Action, Tile
 from app.models import Creature, Position, WorldConfig
 from app.simulation import Simulation
+from app.world import World
 
 
 class SimulationExploreTests(unittest.TestCase):
@@ -159,6 +160,63 @@ class SimulationExploreTests(unittest.TestCase):
         result = self.simulation._detect_recent_loop(self.creature)
 
         self.assertIsNone(result)
+
+
+class WorldLineOfSightTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # 7-wide, 7-tall world; sense_radius=3 so food anywhere inside is in range
+        self.world = World(7, 7, sense_radius=3)
+
+    def test_clear_path_horizontal(self) -> None:
+        self.assertTrue(self.world.has_line_of_sight(3, 1, 3, 5))
+
+    def test_clear_path_vertical(self) -> None:
+        self.assertTrue(self.world.has_line_of_sight(1, 3, 5, 3))
+
+    def test_clear_path_diagonal(self) -> None:
+        self.assertTrue(self.world.has_line_of_sight(1, 1, 5, 5))
+
+    def test_wall_blocks_horizontal(self) -> None:
+        self.world.set_tile(3, 3, Tile.WALL)
+        self.assertFalse(self.world.has_line_of_sight(3, 1, 3, 5))
+
+    def test_wall_blocks_vertical(self) -> None:
+        self.world.set_tile(3, 3, Tile.WALL)
+        self.assertFalse(self.world.has_line_of_sight(1, 3, 5, 3))
+
+    def test_adjacent_cell_always_visible(self) -> None:
+        # No intermediate cells — always line of sight
+        self.world.set_tile(3, 4, Tile.WALL)
+        self.assertTrue(self.world.has_line_of_sight(3, 3, 3, 4))
+
+    def test_get_visible_food_excludes_wall_blocked_food(self) -> None:
+        creature_pos = Position(3, 1)
+        self.world.set_tile(3, 1, Tile.CREATURE)
+        self.world.set_tile(3, 3, Tile.WALL)   # wall between creature and food
+        self.world.set_tile(3, 5, Tile.FOOD)   # food behind wall
+
+        visible = self.world.get_visible_food(creature_pos)
+
+        self.assertNotIn((3, 5), visible)
+
+    def test_get_visible_food_includes_unblocked_food(self) -> None:
+        creature_pos = Position(3, 1)
+        self.world.set_tile(3, 1, Tile.CREATURE)
+        self.world.set_tile(3, 4, Tile.FOOD)   # food with clear path
+
+        visible = self.world.get_visible_food(creature_pos)
+
+        self.assertIn((3, 4), visible)
+
+    def test_get_visible_food_same_row_wall_between(self) -> None:
+        creature_pos = Position(3, 1)
+        self.world.set_tile(3, 1, Tile.CREATURE)
+        self.world.set_tile(3, 2, Tile.WALL)
+        self.world.set_tile(3, 3, Tile.FOOD)
+
+        visible = self.world.get_visible_food(creature_pos)
+
+        self.assertNotIn((3, 3), visible)
 
 
 if __name__ == "__main__":
