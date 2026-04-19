@@ -12,16 +12,16 @@ MAX_LOOP_PATTERN_LEN = 3
 RECOVERY_EXPLORE_STEPS = 4
 MEMORY_LOOP_COOLDOWN_TICKS = 8
 MEMORY_LOOP_DELETE_STRIKES = 3
-REVERSE_PHEROMONE_DECAY = 0.82
-REVERSE_PHEROMONE_DEPOSIT = 1.0
-REVERSE_PHEROMONE_NEIGHBOR_WEIGHT = 0.35
-REVERSE_PHEROMONE_DISTANCE2_WEIGHT = 0.12
-REVERSE_PHEROMONE_PRUNE_THRESHOLD = 0.05
-REVERSE_PHEROMONE_OSCILLATION_PENALTY = 1.75
-REVERSE_PHEROMONE_REPEATED_HIT_PENALTY = 0.5
-REVERSE_PHEROMONE_STAGNATION_RATIO = 0.6
-REVERSE_PHEROMONE_STAGNATION_MULTIPLIER = 1.5
-VISIBLE_PHEROMONE_DECAY = 0.9
+PHEROMONE_DECAY = 0.85
+PHEROMONE_DEPOSIT = 1.0
+PHEROMONE_NEIGHBOR_WEIGHT = 0.35
+PHEROMONE_DISTANCE2_WEIGHT = 0.12
+PHEROMONE_PRUNE_THRESHOLD = 0.05
+PHEROMONE_OSCILLATION_PENALTY = 1.75
+PHEROMONE_REPEATED_HIT_PENALTY = 0.5
+PHEROMONE_STAGNATION_RATIO = 0.6
+PHEROMONE_STAGNATION_MULTIPLIER = 1.5
+VISIBLE_PHEROMONE_DECAY = 0.85
 VISIBLE_PHEROMONE_DEPOSIT = 1.0
 VISIBLE_PHEROMONE_PRUNE_THRESHOLD = 0.05
 OTHER_PHEROMONE_ATTRACTION_WEIGHT = 0.8
@@ -169,7 +169,7 @@ class Simulation:
 
     def _tick_creature(self, creature: Creature) -> None:
         self._tick_down_memory_cooldowns(creature)
-        self._decay_reverse_pheromone(creature)
+        self._decay_pheromone(creature)
         self._decay_visible_pheromone_for_creature(creature)
         pos = creature.position
         sense = self.world.get_sense_vector(pos)
@@ -322,18 +322,18 @@ class Simulation:
         for creature in self.creatures:
             self._maybe_record_pheromone(creature)
 
-    def _decay_reverse_pheromone(self, creature: Creature) -> None:
+    def _decay_pheromone(self, creature: Creature) -> None:
         updated: dict[tuple[int, int], float] = {}
-        for key, strength in creature.reverse_pheromone.items():
-            next_strength = strength * REVERSE_PHEROMONE_DECAY
-            if next_strength >= REVERSE_PHEROMONE_PRUNE_THRESHOLD:
+        for key, strength in creature.pheromone.items():
+            next_strength = strength * PHEROMONE_DECAY
+            if next_strength >= PHEROMONE_PRUNE_THRESHOLD:
                 updated[key] = next_strength
-        creature.reverse_pheromone = updated
+        creature.pheromone = updated
 
-    def _record_reverse_pheromone(self, creature: Creature) -> None:
+    def _record_pheromone(self, creature: Creature) -> None:
         key = (creature.position.row, creature.position.col)
-        creature.reverse_pheromone[key] = (
-            creature.reverse_pheromone.get(key, 0.0) + REVERSE_PHEROMONE_DEPOSIT
+        creature.pheromone[key] = (
+            creature.pheromone.get(key, 0.0) + PHEROMONE_DEPOSIT
         )
 
     def _decay_visible_pheromones(self) -> None:
@@ -352,22 +352,25 @@ class Simulation:
         self.pheromone_trail[key] = (
             self.pheromone_trail.get(key, 0.0) + VISIBLE_PHEROMONE_DEPOSIT
         )
-        creature.visible_pheromone[key] = (
-            creature.visible_pheromone.get(key, 0.0) + VISIBLE_PHEROMONE_DEPOSIT
+        creature.pheromone_ui[key] = (
+            creature.pheromone_ui.get(key, 0.0) + VISIBLE_PHEROMONE_DEPOSIT
         )
         self._dirty_pheromone_cells.add(key)
 
     def _decay_visible_pheromone_for_creature(self, creature: Creature) -> None:
         updated: dict[tuple[int, int], float] = {}
-        for key, strength in creature.visible_pheromone.items():
+        for key, strength in creature.pheromone_ui.items():
             next_strength = strength * VISIBLE_PHEROMONE_DECAY
             if next_strength >= VISIBLE_PHEROMONE_PRUNE_THRESHOLD:
                 updated[key] = next_strength
-        creature.visible_pheromone = updated
+        creature.pheromone_ui = updated
 
     def _maybe_record_pheromone(self, creature: Creature) -> None:
-        if self.rng.random() < self.config.pheromone_drop_chance:
-            self._record_reverse_pheromone(creature)
+        if self.config.pheromone_drop_chance >= 1.0:
+            self._record_pheromone(creature)
+            self._record_visible_pheromone(creature)
+        elif self.rng.random() < self.config.pheromone_drop_chance:
+            self._record_pheromone(creature)
             self._record_visible_pheromone(creature)
 
     def _choose_action_with_lowest_revisit_penalty(
@@ -415,7 +418,7 @@ class Simulation:
         if recent_positions:
             previous_key = (recent_positions[-1].row, recent_positions[-1].col)
             if candidate_key == previous_key:
-                loop_penalty += REVERSE_PHEROMONE_OSCILLATION_PENALTY
+                loop_penalty += PHEROMONE_OSCILLATION_PENALTY
 
         repeated_hits = sum(
             1
@@ -423,7 +426,7 @@ class Simulation:
             if recent_pos.row == candidate.row and recent_pos.col == candidate.col
         )
         if repeated_hits > 0:
-            loop_penalty += repeated_hits * REVERSE_PHEROMONE_REPEATED_HIT_PENALTY
+            loop_penalty += repeated_hits * PHEROMONE_REPEATED_HIT_PENALTY
 
         penalty = base_penalty + loop_penalty
         if creature.follow_pheromone_trail:
@@ -431,28 +434,28 @@ class Simulation:
                 self._other_pheromone_strength(creature, candidate)
                 * OTHER_PHEROMONE_ATTRACTION_WEIGHT
             )
-        if self._recent_progress_ratio(trace_positions) < REVERSE_PHEROMONE_STAGNATION_RATIO:
-            penalty *= REVERSE_PHEROMONE_STAGNATION_MULTIPLIER
+        if self._recent_progress_ratio(trace_positions) < PHEROMONE_STAGNATION_RATIO:
+            penalty *= PHEROMONE_STAGNATION_MULTIPLIER
 
         return penalty
 
     def _reverse_pheromone_strength(self, creature: Creature, pos: Position) -> float:
         total = 0.0
-        for (row, col), strength in creature.reverse_pheromone.items():
+        for (row, col), strength in creature.pheromone.items():
             manhattan_distance = abs(pos.row - row) + abs(pos.col - col)
             if manhattan_distance == 0:
                 total += strength
             elif manhattan_distance == 1:
-                total += strength * REVERSE_PHEROMONE_NEIGHBOR_WEIGHT
+                total += strength * PHEROMONE_NEIGHBOR_WEIGHT
             elif manhattan_distance == 2:
-                total += strength * REVERSE_PHEROMONE_DISTANCE2_WEIGHT
+                total += strength * PHEROMONE_DISTANCE2_WEIGHT
         return total
 
     def _other_pheromone_strength(self, creature: Creature, pos: Position) -> float:
         """Return visible pheromone strength on a tile excluding this creature's own trail."""
         key = (pos.row, pos.col)
         visible = self.pheromone_trail.get(key, 0.0)
-        own = creature.visible_pheromone.get(key, 0.0)
+        own = creature.pheromone_ui.get(key, 0.0)
         return max(0.0, visible - own)
 
     def _recent_progress_ratio(self, positions: list[Position]) -> float:
@@ -835,8 +838,8 @@ class Simulation:
             creature.recovery_loop_positions = []
             creature.memory_cooldowns = {}
             creature.memory_loop_strikes = {}
-            creature.reverse_pheromone = {}
-            creature.visible_pheromone = {}
+            creature.pheromone = {}
+            creature.pheromone_ui = {}
             creature.visit_count_by_pos = {}
             creature.recent_positions = []
             creature.last_explore_scores = []

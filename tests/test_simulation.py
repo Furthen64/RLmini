@@ -29,7 +29,7 @@ class SimulationExploreTests(unittest.TestCase):
             position=Position(2, 2),
             current_action=Action.RIGHT,
             last_action=Action.LEFT,
-            reverse_pheromone={(3, 2): 10.0},
+            pheromone={(3, 2): 10.0},
         )
         self.simulation.creatures = [self.creature]
         self.simulation.world.set_tile(2, 2, Tile.CREATURE)
@@ -101,8 +101,8 @@ class SimulationExploreTests(unittest.TestCase):
         simulation._execute_move(creature, Action.DOWN, sense, creature.mode)
 
         self.assertGreater(simulation.pheromone_trail.get((3, 2), 0.0), 0.0)
-        self.assertGreater(creature.reverse_pheromone.get((3, 2), 0.0), 0.0)
-        self.assertGreater(creature.visible_pheromone.get((3, 2), 0.0), 0.0)
+        self.assertGreater(creature.pheromone.get((3, 2), 0.0), 0.0)
+        self.assertGreater(creature.pheromone_ui.get((3, 2), 0.0), 0.0)
         self.assertIn((3, 2), simulation.take_dirty_cells())
 
     def test_execute_move_skips_pheromone_when_probability_misses(self) -> None:
@@ -124,8 +124,8 @@ class SimulationExploreTests(unittest.TestCase):
         simulation._execute_move(creature, Action.DOWN, sense, creature.mode)
 
         self.assertEqual(simulation.pheromone_trail.get((3, 2), 0.0), 0.0)
-        self.assertEqual(creature.reverse_pheromone.get((3, 2), 0.0), 0.0)
-        self.assertEqual(creature.visible_pheromone.get((3, 2), 0.0), 0.0)
+        self.assertEqual(creature.pheromone.get((3, 2), 0.0), 0.0)
+        self.assertEqual(creature.pheromone_ui.get((3, 2), 0.0), 0.0)
 
     def test_detect_recent_loop_catches_position_revisit(self) -> None:
         """A 6-step cycle that isn't a simple suffix repetition is caught by position-revisit detection."""
