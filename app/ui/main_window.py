@@ -21,7 +21,12 @@ from app.map_format import (
     save_map_document,
     update_map_best_food_time,
 )
-from app.models import WorldConfig, Creature, TickSnapshot
+from app.models import (
+    WorldConfig,
+    Creature,
+    TickSnapshot,
+    EXPLORE_HISTORY_WINDOW_DEFAULT,
+)
 from app.simulation import Simulation
 from app.reproduction import reproduce
 from app.settings_store import load_settings, save_settings
@@ -243,7 +248,9 @@ class MainWindow(QMainWindow):
             match_threshold=s.get("match_threshold", 0.75),
             cell_size=s.get("cell_size", 32),
             sense_radius=s.get("sense_radius", 1),
-            explore_history_window=int(s.get("explore_history_window", 15)),
+            explore_history_window=int(
+                s.get("explore_history_window", EXPLORE_HISTORY_WINDOW_DEFAULT)
+            ),
             explore_new_tile_bonus=float(s.get("explore_new_tile_bonus", 10.0)),
             explore_low_visit_factor=float(s.get("explore_low_visit_factor", 1.0)),
             explore_recent_repeat_penalty=float(s.get("explore_recent_repeat_penalty", 5.0)),

@@ -777,6 +777,9 @@ class Simulation:
         key = (creature.position.row, creature.position.col)
         creature.visit_count_by_pos[key] = creature.visit_count_by_pos.get(key, 0) + 1
         creature.recent_positions.append(key)
+        window = max(1, int(self.config.explore_history_window))
+        if len(creature.recent_positions) > window:
+            del creature.recent_positions[:-window]
 
     def _direction_to(self, src: Position, dst: Position) -> int:
         dr = dst.row - src.row

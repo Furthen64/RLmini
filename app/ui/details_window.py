@@ -23,6 +23,7 @@ MODE_NAMES: dict[int, str] = {
 }
 
 TILE_SHORT: dict[int, str] = {0: "E", 1: "W", 2: "F", 3: "C"}
+RECENT_POSITIONS_DISPLAY_LIMIT = 16
 
 
 def _sv_str(sv: list[int]) -> str:
@@ -211,9 +212,15 @@ class DetailsWindow(QWidget):
         vc = creature.visit_count_by_pos.get(pos_key, 0)
         self.explore_visit_label.setText(f"Visit count (current tile): {vc}")
 
-        recent = creature.recent_positions[-15:] if creature.recent_positions else []
+        recent = (
+            creature.recent_positions[-RECENT_POSITIONS_DISPLAY_LIMIT:]
+            if creature.recent_positions
+            else []
+        )
         recent_str = ", ".join(f"({r},{c})" for r, c in recent) or "(none)"
-        self.explore_recent_label.setText(f"Recent positions [{len(creature.recent_positions)}]: {recent_str}")
+        self.explore_recent_label.setText(
+            f"Recent positions (last {RECENT_POSITIONS_DISPLAY_LIMIT}): {recent_str}"
+        )
 
         score_lines = []
         for action, key, score, new_tile, in_recent, is_rev in creature.last_explore_scores:
@@ -313,8 +320,8 @@ class DetailsWindow(QWidget):
         pos_key = (c.position.row, c.position.col)
         vc = c.visit_count_by_pos.get(pos_key, 0)
         lines.append(f"  Visit count (current tile): {vc}")
-        lines.append(f"  Recent positions ({len(c.recent_positions)} total):")
-        recent = c.recent_positions[-15:]
+        lines.append(f"  Recent positions (last {RECENT_POSITIONS_DISPLAY_LIMIT}):")
+        recent = c.recent_positions[-RECENT_POSITIONS_DISPLAY_LIMIT:]
         lines.append("  " + ", ".join(f"({r},{c_})" for r, c_ in recent) or "  (none)")
         if c.last_explore_scores:
             lines.append("  Last explore candidate scores:")

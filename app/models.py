@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 # Explore scoring defaults (also configurable via WorldConfig / settings)
-EXPLORE_HISTORY_WINDOW_DEFAULT: int = 15
+EXPLORE_HISTORY_WINDOW_DEFAULT: int = 16
 EXPLORE_NEW_TILE_BONUS_DEFAULT: float = 10.0
 EXPLORE_LOW_VISIT_FACTOR_DEFAULT: float = 1.0
 EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT: float = 5.0
