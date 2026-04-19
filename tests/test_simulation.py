@@ -126,6 +126,40 @@ class SimulationExploreTests(unittest.TestCase):
         self.assertEqual(creature.reverse_pheromone.get((3, 2), 0.0), 0.0)
         self.assertEqual(creature.visible_pheromone.get((3, 2), 0.0), 0.0)
 
+    def test_detect_recent_loop_catches_position_revisit(self) -> None:
+        """A 6-step cycle that isn't a simple suffix repetition is caught by position-revisit detection."""
+        # Reproduces the bug: (7,13)→(7,12)→(7,11)→(7,12)→(7,13)→(6,13)
+        # (7,12) and (7,13) each appear twice, but there is no repeated suffix pattern.
+        steps = [
+            (Position(7, 13), [], 3, None),   # LEFT
+            (Position(7, 12), [], 3, None),   # LEFT
+            (Position(7, 11), [], 2, 0),      # RIGHT (memory 0)
+            (Position(7, 12), [], 2, None),   # RIGHT
+            (Position(7, 13), [], 0, None),   # UP
+            (Position(6, 13), [], 1, 0),      # DOWN (memory 0)
+        ]
+        self.creature.recent_steps = steps
+
+        result = self.simulation._detect_recent_loop(self.creature)
+
+        self.assertIsNotNone(result)
+
+    def test_detect_recent_loop_no_false_positive_unique_positions(self) -> None:
+        """A sequence with all unique positions should NOT trigger loop detection."""
+        steps = [
+            (Position(1, 1), [], 2, None),
+            (Position(1, 2), [], 2, None),
+            (Position(1, 3), [], 1, None),
+            (Position(2, 3), [], 3, None),
+            (Position(3, 3), [], 3, None),
+            (Position(3, 2), [], 3, None),
+        ]
+        self.creature.recent_steps = steps
+
+        result = self.simulation._detect_recent_loop(self.creature)
+
+        self.assertIsNone(result)
+
 
 if __name__ == "__main__":
     unittest.main()
