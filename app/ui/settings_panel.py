@@ -5,6 +5,13 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal
 
 from app.config import DEFAULT_RNG_SEED
+from app.models import (
+    EXPLORE_HISTORY_WINDOW_DEFAULT,
+    EXPLORE_NEW_TILE_BONUS_DEFAULT,
+    EXPLORE_LOW_VISIT_FACTOR_DEFAULT,
+    EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT,
+    EXPLORE_REVERSE_PENALTY_DEFAULT,
+)
 
 
 class SettingsPanel(QWidget):
@@ -107,6 +114,50 @@ class SettingsPanel(QWidget):
 
         main_layout.addWidget(group)
 
+        # Exploration novelty settings
+        explore_group = QGroupBox("Exploration Settings")
+        explore_form = QFormLayout(explore_group)
+
+        self.sb_explore_window = QSpinBox()
+        self.sb_explore_window.setRange(1, 200)
+        self.sb_explore_window.setValue(EXPLORE_HISTORY_WINDOW_DEFAULT)
+        self.sb_explore_window.setToolTip(
+            "Number of recent positions used for repeat-penalty scoring"
+        )
+        explore_form.addRow("History Window:", self.sb_explore_window)
+
+        self.dsb_new_tile_bonus = QDoubleSpinBox()
+        self.dsb_new_tile_bonus.setRange(0.0, 100.0)
+        self.dsb_new_tile_bonus.setSingleStep(1.0)
+        self.dsb_new_tile_bonus.setValue(EXPLORE_NEW_TILE_BONUS_DEFAULT)
+        self.dsb_new_tile_bonus.setToolTip("Score bonus for visiting a tile not yet seen this epoch")
+        explore_form.addRow("New Tile Bonus:", self.dsb_new_tile_bonus)
+
+        self.dsb_low_visit_factor = QDoubleSpinBox()
+        self.dsb_low_visit_factor.setRange(0.0, 100.0)
+        self.dsb_low_visit_factor.setSingleStep(0.1)
+        self.dsb_low_visit_factor.setValue(EXPLORE_LOW_VISIT_FACTOR_DEFAULT)
+        self.dsb_low_visit_factor.setToolTip("Factor for 1/(1+visit_count) low-visit bonus")
+        explore_form.addRow("Low Visit Factor:", self.dsb_low_visit_factor)
+
+        self.dsb_recent_repeat_penalty = QDoubleSpinBox()
+        self.dsb_recent_repeat_penalty.setRange(0.0, 100.0)
+        self.dsb_recent_repeat_penalty.setSingleStep(1.0)
+        self.dsb_recent_repeat_penalty.setValue(EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT)
+        self.dsb_recent_repeat_penalty.setToolTip(
+            "Score penalty when candidate tile is in the recent-positions window"
+        )
+        explore_form.addRow("Recent Repeat Penalty:", self.dsb_recent_repeat_penalty)
+
+        self.dsb_reverse_penalty = QDoubleSpinBox()
+        self.dsb_reverse_penalty.setRange(0.0, 100.0)
+        self.dsb_reverse_penalty.setSingleStep(0.5)
+        self.dsb_reverse_penalty.setValue(EXPLORE_REVERSE_PENALTY_DEFAULT)
+        self.dsb_reverse_penalty.setToolTip("Score penalty for immediately reversing the last move")
+        explore_form.addRow("Reverse Move Penalty:", self.dsb_reverse_penalty)
+
+        main_layout.addWidget(explore_group)
+
         btn_layout = QHBoxLayout()
         self.btn_save = QPushButton("Save Settings")
         self.btn_reload = QPushButton("Reload Settings")
@@ -137,6 +188,11 @@ class SettingsPanel(QWidget):
             "show_creature_ids": self.cb_creature_ids.isChecked(),
             "highlight_selected": self.cb_highlight.isChecked(),
             "show_pheromone_trail": self.cb_pheromone_trail.isChecked(),
+            "explore_history_window": self.sb_explore_window.value(),
+            "explore_new_tile_bonus": self.dsb_new_tile_bonus.value(),
+            "explore_low_visit_factor": self.dsb_low_visit_factor.value(),
+            "explore_recent_repeat_penalty": self.dsb_recent_repeat_penalty.value(),
+            "explore_reverse_penalty": self.dsb_reverse_penalty.value(),
         }
 
     def apply_settings(self, settings: dict) -> None:
@@ -158,3 +214,18 @@ class SettingsPanel(QWidget):
         self.cb_creature_ids.setChecked(bool(settings.get("show_creature_ids", True)))
         self.cb_highlight.setChecked(bool(settings.get("highlight_selected", True)))
         self.cb_pheromone_trail.setChecked(bool(settings.get("show_pheromone_trail", True)))
+        self.sb_explore_window.setValue(
+            int(settings.get("explore_history_window", EXPLORE_HISTORY_WINDOW_DEFAULT))
+        )
+        self.dsb_new_tile_bonus.setValue(
+            float(settings.get("explore_new_tile_bonus", EXPLORE_NEW_TILE_BONUS_DEFAULT))
+        )
+        self.dsb_low_visit_factor.setValue(
+            float(settings.get("explore_low_visit_factor", EXPLORE_LOW_VISIT_FACTOR_DEFAULT))
+        )
+        self.dsb_recent_repeat_penalty.setValue(
+            float(settings.get("explore_recent_repeat_penalty", EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT))
+        )
+        self.dsb_reverse_penalty.setValue(
+            float(settings.get("explore_reverse_penalty", EXPLORE_REVERSE_PENALTY_DEFAULT))
+        )

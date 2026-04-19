@@ -1,6 +1,13 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+# Explore scoring defaults (also configurable via WorldConfig / settings)
+EXPLORE_HISTORY_WINDOW_DEFAULT: int = 15
+EXPLORE_NEW_TILE_BONUS_DEFAULT: float = 10.0
+EXPLORE_LOW_VISIT_FACTOR_DEFAULT: float = 1.0
+EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT: float = 5.0
+EXPLORE_REVERSE_PENALTY_DEFAULT: float = 3.0
+
 
 @dataclass
 class Position:
@@ -49,6 +56,12 @@ class Creature:
     memory_loop_strikes: dict[int, int] = field(default_factory=dict)
     reverse_pheromone: dict[tuple[int, int], float] = field(default_factory=dict)
     visible_pheromone: dict[tuple[int, int], float] = field(default_factory=dict)
+    # Exploration novelty state (reset each epoch)
+    visit_count_by_pos: dict[tuple[int, int], int] = field(default_factory=dict)
+    recent_positions: list[tuple[int, int]] = field(default_factory=list)
+    # Last explore candidate scores for debug display:
+    # list of (action, pos_key, score, new_tile, in_recent, is_reversal)
+    last_explore_scores: list[tuple[int, tuple[int, int], float, bool, bool, bool]] = field(default_factory=list)
 
 
 @dataclass
@@ -70,6 +83,12 @@ class WorldConfig:
     sense_radius: int = 1
     pheromone_drop_chance: float = 0.35
     pheromone_follow_chance: float = 0.5
+    # Exploration novelty scoring weights
+    explore_history_window: int = EXPLORE_HISTORY_WINDOW_DEFAULT
+    explore_new_tile_bonus: float = EXPLORE_NEW_TILE_BONUS_DEFAULT
+    explore_low_visit_factor: float = EXPLORE_LOW_VISIT_FACTOR_DEFAULT
+    explore_recent_repeat_penalty: float = EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT
+    explore_reverse_penalty: float = EXPLORE_REVERSE_PENALTY_DEFAULT
 
 
 @dataclass
