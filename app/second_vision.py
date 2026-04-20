@@ -144,22 +144,21 @@ def update_second_vision(
     endpoints, ray_discovered = cast_rays(creature, world, ray_length)
     sv.ray_endpoints = endpoints
 
-    # Check whether anything changed before writing so we can set dirty flag
-    old_size = len(sv.discovered_tiles)
-    old_tiles = sv.discovered_tiles
+    tiles = sv.discovered_tiles
+    changed = False
 
     # Merge ray observations
     for pos, tile in ray_discovered.items():
-        if old_tiles.get(pos) != tile:
-            sv._dirty = True
-        old_tiles[pos] = tile
+        if tiles.get(pos) != tile:
+            changed = True
+            tiles[pos] = tile
 
     # Also record the creature's own position
     own_key = (creature.position.row, creature.position.col)
     own_tile = world.get_tile(creature.position.row, creature.position.col)
-    if old_tiles.get(own_key) != own_tile:
-        sv._dirty = True
-    old_tiles[own_key] = own_tile
+    if tiles.get(own_key) != own_tile:
+        changed = True
+        tiles[own_key] = own_tile
 
     # Merge near-field sense vector (already computed this tick)
     if creature.current_sense_vector:
@@ -168,13 +167,11 @@ def update_second_vision(
         r0, c0 = creature.position.row, creature.position.col
         for (dr, dc), tile in zip(offsets, creature.current_sense_vector):
             key = (r0 + dr, c0 + dc)
-            if old_tiles.get(key) != tile:
-                sv._dirty = True
-            old_tiles[key] = tile
-
-    if len(sv.discovered_tiles) != old_size:
-        sv._dirty = True
+            if tiles.get(key) != tile:
+                changed = True
+                tiles[key] = tile
 
     # Recompute areas only when something changed
-    if sv._dirty:
+    if changed:
+        sv._dirty = True
         _recompute_areas(sv)
