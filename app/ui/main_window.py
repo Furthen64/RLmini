@@ -524,7 +524,10 @@ class MainWindow(QMainWindow):
         else:
             self._update_ui()
             changed = self.simulation.take_dirty_cells()
-            self.grid_widget.refresh_dirty(changed)
+            if self.grid_widget.show_second_vision and self.selected_creature is not None:
+                self.grid_widget.refresh()
+            else:
+                self.grid_widget.refresh_dirty(changed)
 
     def _auto_epoch_end(self) -> None:
         if self.simulation is None:

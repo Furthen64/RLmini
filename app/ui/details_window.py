@@ -121,13 +121,19 @@ class DetailsWindow(QWidget):
         sv_layout = QVBoxLayout(sv_group)
         self.sv_discovered_label = QLabel("Discovered tiles: -")
         self.sv_areas_label = QLabel("Distinct areas: -")
+        self.sv_food_label = QLabel("Food spotted: -")
         self.sv_rays_text = QTextEdit()
         self.sv_rays_text.setReadOnly(True)
         self.sv_rays_text.setFixedHeight(80)
-        for w in [self.sv_discovered_label, self.sv_areas_label]:
+        self.sv_food_text = QTextEdit()
+        self.sv_food_text.setReadOnly(True)
+        self.sv_food_text.setFixedHeight(70)
+        for w in [self.sv_discovered_label, self.sv_areas_label, self.sv_food_label]:
             sv_layout.addWidget(w)
         sv_layout.addWidget(QLabel("Ray endpoints (last tick):"))
         sv_layout.addWidget(self.sv_rays_text)
+        sv_layout.addWidget(QLabel("Food spotted (X, Y):"))
+        sv_layout.addWidget(self.sv_food_text)
         layout.addWidget(sv_group)
 
         layout.addStretch()
@@ -153,7 +159,9 @@ class DetailsWindow(QWidget):
             self.explore_scores_text.setPlainText("")
             self.sv_discovered_label.setText("Discovered tiles: -")
             self.sv_areas_label.setText("Distinct areas: -")
+            self.sv_food_label.setText("Food spotted: -")
             self.sv_rays_text.setPlainText("")
+            self.sv_food_text.setPlainText("")
             return
 
         # Skip full refresh if creature state is unchanged
@@ -164,6 +172,7 @@ class DetailsWindow(QWidget):
             len(creature.last_explore_scores),
             len(creature.second_vision.discovered_tiles),
             len(creature.second_vision.area_map),
+            len(creature.second_vision.food_spotted),
         )
         if key == self._last_update_key:
             return
@@ -264,12 +273,20 @@ class DetailsWindow(QWidget):
         self.sv_discovered_label.setText(f"Discovered tiles: {len(sv.discovered_tiles)}")
         distinct_areas = len(set(sv.area_map.values())) if sv.area_map else 0
         self.sv_areas_label.setText(f"Distinct areas: {distinct_areas}")
+        self.sv_food_label.setText(f"Food spotted: {len(sv.food_spotted)}")
         ray_lines = [
             f"  [{i}] ({r},{c})"
             for i, (r, c) in enumerate(sv.ray_endpoints)
         ]
         self.sv_rays_text.setPlainText(
             "\n".join(ray_lines) if ray_lines else "(no data yet)"
+        )
+        food_lines = [
+            f"  {c}, {r}, FOOD_FOUND"
+            for r, c in sv.food_spotted
+        ]
+        self.sv_food_text.setPlainText(
+            "\n".join(food_lines) if food_lines else "(none spotted)"
         )
 
     def refresh(self) -> None:
