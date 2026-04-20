@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from app.enums import Action, Tile, CreatureMode
 from app.models import Creature, Position, WorldConfig
@@ -160,6 +161,37 @@ class SimulationExploreTests(unittest.TestCase):
         result = self.simulation._detect_recent_loop(self.creature)
 
         self.assertIsNone(result)
+
+    def test_second_vision_updates_only_every_tenth_tick(self) -> None:
+        config = WorldConfig(
+            width=7,
+            height=7,
+            creature_count=2,
+            food_count=0,
+            wall_count=0,
+            seed=1,
+            pheromone_drop_chance=0.0,
+        )
+        simulation = Simulation(config)
+
+        with patch("app.simulation.update_second_vision") as update_mock:
+            for _ in range(9):
+                simulation.tick()
+
+            self.assertEqual(update_mock.call_count, 0)
+
+            simulation.tick()
+
+            self.assertEqual(update_mock.call_count, len(simulation.creatures))
+
+            for _ in range(9):
+                simulation.tick()
+
+            self.assertEqual(update_mock.call_count, len(simulation.creatures))
+
+            simulation.tick()
+
+            self.assertEqual(update_mock.call_count, len(simulation.creatures) * 2)
 
 
 class WorldLineOfSightTests(unittest.TestCase):

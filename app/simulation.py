@@ -26,6 +26,7 @@ VISIBLE_PHEROMONE_DECAY = 0.85
 VISIBLE_PHEROMONE_DEPOSIT = 1.0
 VISIBLE_PHEROMONE_PRUNE_THRESHOLD = 0.05
 OTHER_PHEROMONE_ATTRACTION_WEIGHT = 0.8
+SECOND_VISION_UPDATE_INTERVAL_TICKS = 10
 
 
 class Simulation:
@@ -157,13 +158,17 @@ class Simulation:
         self._decay_visible_pheromones()
         order = list(self.creatures)
         self.rng.shuffle(order)
+        should_update_second_vision = (
+            (self.stats.tick + 1) % SECOND_VISION_UPDATE_INTERVAL_TICKS == 0
+        )
         for creature in order:
             self._tick_creature(creature)
-            update_second_vision(
-                creature,
-                self.world,
-                self.config.second_vision_ray_length,
-            )
+            if should_update_second_vision:
+                update_second_vision(
+                    creature,
+                    self.world,
+                    self.config.second_vision_ray_length,
+                )
         self.stats.tick += 1
         self._update_stats()
         self.history.append(TickSnapshot(
