@@ -11,6 +11,7 @@ from app.models import (
     EXPLORE_LOW_VISIT_FACTOR_DEFAULT,
     EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT,
     EXPLORE_REVERSE_PENALTY_DEFAULT,
+    SECOND_VISION_RAY_LENGTH_DEFAULT,
 )
 
 
@@ -112,6 +113,19 @@ class SettingsPanel(QWidget):
         self.cb_pheromone_trail.setChecked(True)
         form.addRow("View pheromone trail:", self.cb_pheromone_trail)
 
+        self.cb_second_vision = QCheckBox()
+        self.cb_second_vision.setChecked(False)
+        self.cb_second_vision.setToolTip(
+            "Overlay Second Vision (ray-cast map + area colours) for the selected creature"
+        )
+        form.addRow("Show Second Vision:", self.cb_second_vision)
+
+        self.sb_sv_ray_length = QSpinBox()
+        self.sb_sv_ray_length.setRange(1, 50)
+        self.sb_sv_ray_length.setValue(SECOND_VISION_RAY_LENGTH_DEFAULT)
+        self.sb_sv_ray_length.setToolTip("Maximum number of tiles each Second Vision ray travels")
+        form.addRow("SV Ray Length:", self.sb_sv_ray_length)
+
         main_layout.addWidget(group)
 
         # Exploration novelty settings
@@ -188,6 +202,8 @@ class SettingsPanel(QWidget):
             "show_creature_ids": self.cb_creature_ids.isChecked(),
             "highlight_selected": self.cb_highlight.isChecked(),
             "show_pheromone_trail": self.cb_pheromone_trail.isChecked(),
+            "show_second_vision": self.cb_second_vision.isChecked(),
+            "second_vision_ray_length": self.sb_sv_ray_length.value(),
             "explore_history_window": self.sb_explore_window.value(),
             "explore_new_tile_bonus": self.dsb_new_tile_bonus.value(),
             "explore_low_visit_factor": self.dsb_low_visit_factor.value(),
@@ -214,6 +230,10 @@ class SettingsPanel(QWidget):
         self.cb_creature_ids.setChecked(bool(settings.get("show_creature_ids", True)))
         self.cb_highlight.setChecked(bool(settings.get("highlight_selected", True)))
         self.cb_pheromone_trail.setChecked(bool(settings.get("show_pheromone_trail", True)))
+        self.cb_second_vision.setChecked(bool(settings.get("show_second_vision", False)))
+        self.sb_sv_ray_length.setValue(
+            int(settings.get("second_vision_ray_length", SECOND_VISION_RAY_LENGTH_DEFAULT))
+        )
         self.sb_explore_window.setValue(
             int(settings.get("explore_history_window", EXPLORE_HISTORY_WINDOW_DEFAULT))
         )

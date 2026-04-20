@@ -3,9 +3,10 @@ from typing import Optional
 
 from app.enums import Tile, Action, CreatureMode
 from app.map_format import MAP_FOOD, MapDocument
-from app.models import Position, Creature, WorldConfig, SimulationStats, TickSnapshot
+from app.models import Position, Creature, WorldConfig, SimulationStats, TickSnapshot, SecondVisionData
 from app.world import World, CARDINAL_OFFSETS
 from app.memory import find_best_memory_match, try_create_memory
+from app.second_vision import update_second_vision
 
 MAX_RECENT_STEPS = 6
 MAX_LOOP_PATTERN_LEN = 3
@@ -158,6 +159,11 @@ class Simulation:
         self.rng.shuffle(order)
         for creature in order:
             self._tick_creature(creature)
+            update_second_vision(
+                creature,
+                self.world,
+                self.config.second_vision_ray_length,
+            )
         self.stats.tick += 1
         self._update_stats()
         self.history.append(TickSnapshot(
@@ -846,6 +852,7 @@ class Simulation:
             creature.visit_count_by_pos = {}
             creature.recent_positions = []
             creature.last_explore_scores = []
+            creature.second_vision = SecondVisionData()
         self.pheromone_trail = {}
         self._dirty_pheromone_cells = set()
 
