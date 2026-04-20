@@ -116,6 +116,20 @@ class DetailsWindow(QWidget):
         explore_layout.addWidget(self.explore_scores_text)
         layout.addWidget(explore_group)
 
+        # Second Vision debug
+        sv_group = QGroupBox("Second Vision")
+        sv_layout = QVBoxLayout(sv_group)
+        self.sv_discovered_label = QLabel("Discovered tiles: -")
+        self.sv_areas_label = QLabel("Distinct areas: -")
+        self.sv_rays_text = QTextEdit()
+        self.sv_rays_text.setReadOnly(True)
+        self.sv_rays_text.setFixedHeight(80)
+        for w in [self.sv_discovered_label, self.sv_areas_label]:
+            sv_layout.addWidget(w)
+        sv_layout.addWidget(QLabel("Ray endpoints (last tick):"))
+        sv_layout.addWidget(self.sv_rays_text)
+        layout.addWidget(sv_group)
+
         layout.addStretch()
 
     def update_creature(self, creature: Creature | None) -> None:
@@ -137,6 +151,9 @@ class DetailsWindow(QWidget):
             self.explore_visit_label.setText("Visit count (current tile): -")
             self.explore_recent_label.setText("Recent positions: -")
             self.explore_scores_text.setPlainText("")
+            self.sv_discovered_label.setText("Discovered tiles: -")
+            self.sv_areas_label.setText("Distinct areas: -")
+            self.sv_rays_text.setPlainText("")
             return
 
         # Skip full refresh if creature state is unchanged
@@ -145,6 +162,8 @@ class DetailsWindow(QWidget):
             creature.mode, creature.current_action, creature.food_score,
             creature.active_memory_idx, len(creature.memories),
             len(creature.last_explore_scores),
+            len(creature.second_vision.discovered_tiles),
+            len(creature.second_vision.area_map),
         )
         if key == self._last_update_key:
             return
@@ -238,6 +257,19 @@ class DetailsWindow(QWidget):
             )
         self.explore_scores_text.setPlainText(
             "\n".join(score_lines) if score_lines else "(not in explore mode)"
+        )
+
+        # Second Vision debug
+        sv = creature.second_vision
+        self.sv_discovered_label.setText(f"Discovered tiles: {len(sv.discovered_tiles)}")
+        distinct_areas = len(set(sv.area_map.values())) if sv.area_map else 0
+        self.sv_areas_label.setText(f"Distinct areas: {distinct_areas}")
+        ray_lines = [
+            f"  [{i}] ({r},{c})"
+            for i, (r, c) in enumerate(sv.ray_endpoints)
+        ]
+        self.sv_rays_text.setPlainText(
+            "\n".join(ray_lines) if ray_lines else "(no data yet)"
         )
 
     def refresh(self) -> None:

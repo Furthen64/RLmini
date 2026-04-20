@@ -8,6 +8,9 @@ EXPLORE_LOW_VISIT_FACTOR_DEFAULT: float = 1.0
 EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT: float = 5.0
 EXPLORE_REVERSE_PENALTY_DEFAULT: float = 3.0
 
+# Second Vision defaults
+SECOND_VISION_RAY_LENGTH_DEFAULT: int = 15
+
 
 @dataclass
 class Position:
@@ -30,6 +33,18 @@ class MemoryStep:
 @dataclass
 class MemorySequence:
     steps: list[MemoryStep]
+
+
+@dataclass
+class SecondVisionData:
+    # (row, col) → Tile value for every cell the creature has observed via rays
+    discovered_tiles: dict[tuple[int, int], int] = field(default_factory=dict)
+    # (row, col) → area_id for non-wall cells (populated by flood-fill)
+    area_map: dict[tuple[int, int], int] = field(default_factory=dict)
+    # Endpoints of the 9 rays cast last tick (wall-hit or max-range position)
+    ray_endpoints: list[tuple[int, int]] = field(default_factory=list)
+    # Internal dirty flag; set True when discovered_tiles changes
+    _dirty: bool = False
 
 
 @dataclass
@@ -62,6 +77,8 @@ class Creature:
     # Last explore candidate scores for debug display:
     # list of (action, pos_key, score, new_tile, in_recent, is_reversal)
     last_explore_scores: list[tuple[int, tuple[int, int], float, bool, bool, bool]] = field(default_factory=list)
+    # Second Vision layer (debug/visualisation only – not used by the AI)
+    second_vision: SecondVisionData = field(default_factory=SecondVisionData)
 
 
 @dataclass
@@ -89,6 +106,8 @@ class WorldConfig:
     explore_low_visit_factor: float = EXPLORE_LOW_VISIT_FACTOR_DEFAULT
     explore_recent_repeat_penalty: float = EXPLORE_RECENT_REPEAT_PENALTY_DEFAULT
     explore_reverse_penalty: float = EXPLORE_REVERSE_PENALTY_DEFAULT
+    # Second Vision
+    second_vision_ray_length: int = SECOND_VISION_RAY_LENGTH_DEFAULT
 
 
 @dataclass

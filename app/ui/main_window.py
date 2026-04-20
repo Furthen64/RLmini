@@ -26,6 +26,7 @@ from app.models import (
     Creature,
     TickSnapshot,
     EXPLORE_HISTORY_WINDOW_DEFAULT,
+    SECOND_VISION_RAY_LENGTH_DEFAULT,
 )
 from app.simulation import Simulation
 from app.reproduction import reproduce
@@ -255,6 +256,9 @@ class MainWindow(QMainWindow):
             explore_low_visit_factor=float(s.get("explore_low_visit_factor", 1.0)),
             explore_recent_repeat_penalty=float(s.get("explore_recent_repeat_penalty", 5.0)),
             explore_reverse_penalty=float(s.get("explore_reverse_penalty", 3.0)),
+            second_vision_ray_length=int(
+                s.get("second_vision_ray_length", SECOND_VISION_RAY_LENGTH_DEFAULT)
+            ),
         )
         if s.get("seed_fixed"):
             seed: Optional[int] = s.get("seed")
