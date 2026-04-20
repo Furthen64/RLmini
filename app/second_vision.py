@@ -96,6 +96,8 @@ def _recompute_areas(sv: SecondVisionData) -> None:
 
     Each connected component of walkable cells gets a unique integer area_id.
     The result is stored in sv.area_map (previous contents are replaced).
+    Food positions spotted within discovered tiles are recorded in sv.food_spotted
+    as a sorted list of (row, col) tuples.
     """
     walkable = {
         pos
@@ -122,6 +124,13 @@ def _recompute_areas(sv: SecondVisionData) -> None:
                     visited.add(nb)
                     queue.append(nb)
         area_id += 1
+
+    # Record food positions visible in the discovered tile set
+    sv.food_spotted = sorted(
+        pos
+        for pos, tile in sv.discovered_tiles.items()
+        if tile == Tile.FOOD
+    )
 
     sv._dirty = False
 

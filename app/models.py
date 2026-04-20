@@ -43,6 +43,8 @@ class SecondVisionData:
     area_map: dict[tuple[int, int], int] = field(default_factory=dict)
     # Endpoints of the 9 rays cast last tick (wall-hit or max-range position)
     ray_endpoints: list[tuple[int, int]] = field(default_factory=list)
+    # Food positions spotted among discovered tiles (populated by BFS, format: (row, col))
+    food_spotted: list[tuple[int, int]] = field(default_factory=list)
     # Internal dirty flag; set True when discovered_tiles changes
     _dirty: bool = False
 
